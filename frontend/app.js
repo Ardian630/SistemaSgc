@@ -4,12 +4,12 @@ import { showAlert, showConfirm } from './notifications.js';
 // Importa los módulos auth.js y ui.js. Sin datos mock ni localStorage.
 // =========================================================================
 
-import { 
-    initializeAuth, 
-    getCurrentUser, 
-    handleRegisterAdminSubmit, 
-    handleLoginSubmit, 
-    handleLogoutClick 
+import {
+    initializeAuth,
+    getCurrentUser,
+    handleRegisterAdminSubmit,
+    handleLoginSubmit,
+    handleLogoutClick
 } from "./auth.js";
 
 import {
@@ -50,10 +50,10 @@ import {
     uiUpdateUserRole
 } from "./ui.js";
 
-import { 
-    isSupabaseConnected, 
-    apiGetRoles, 
-    apiResetPasswordForEmail, 
+import {
+    isSupabaseConnected,
+    apiGetRoles,
+    apiResetPasswordForEmail,
     apiUpdatePassword,
     apiCreateNucleoSimple,
     apiUpdateNucleo,
@@ -92,7 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await initializeAuth();
 
     const currentUser = getCurrentUser();
-    
+
     if (currentUser) {
         await initApp();
     }
@@ -121,7 +121,7 @@ const PANEL_HASH_MAP = {
 function getPanelIdFromHash() {
     const rawHash = (window.location.hash || "").replace("#", "").trim().toLowerCase();
     if (!rawHash) return null;
-    
+
     if (document.getElementById(rawHash)) return rawHash;
     if (document.getElementById("panel-" + rawHash)) return "panel-" + rawHash;
 
@@ -219,7 +219,7 @@ async function populateRoleSelector() {
         // Solo administradores (fuerte o débil) pueden ver el panel de usuarios
         const isAdmin = currentRoleName.includes("administrador") || currentRoleName.includes("admin");
         const menuUsr = document.getElementById("menu-item-usuarios");
-        
+
         if (isAdmin) {
             menuUsr.classList.remove("hidden");
         } else {
@@ -232,7 +232,7 @@ async function populateRoleSelector() {
         usrRolSelect.innerHTML = `<option value="">Seleccione un rol...</option>`;
 
         const allowedRoleNames = ["administrador_debil", "líder de comunidad", "lider de comunidad", "consultor"];
-        
+
         roles.forEach(r => {
             if (allowedRoleNames.includes(r.nombre_rol.toLowerCase())) {
                 usrRolSelect.innerHTML += `<option value="${r.id_rol}">${r.nombre_rol}</option>`;
@@ -356,7 +356,7 @@ function setupEventListeners() {
             item.classList.add("active");
             const targetId = item.getAttribute("data-target");
             const targetPanel = document.getElementById(targetId);
-            
+
             if (targetId) {
                 localStorage.setItem("activePanelId", targetId);
                 sessionStorage.setItem("activePanelId", targetId);
@@ -367,7 +367,7 @@ function setupEventListeners() {
             }
 
             if (targetPanel) targetPanel.classList.add("active");
-            
+
             if (targetId === "panel-dashboard") renderDashboard();
             if (targetId === "panel-personas") renderPersonasTable();
             if (targetId === "panel-familias") renderFamilias();
@@ -496,7 +496,7 @@ function setupEventListeners() {
     document.getElementById("filter-genero").addEventListener("change", renderPersonasTable);
     document.getElementById("filter-tipo-vivienda").addEventListener("change", renderPersonasTable);
     document.getElementById("filter-discapacidad-nivel").addEventListener("change", renderPersonasTable);
-    
+
     document.querySelectorAll(".filter-discapacidad-type").forEach(el => {
         el.addEventListener("change", renderPersonasTable);
     });
@@ -509,15 +509,15 @@ function setupEventListeners() {
         document.getElementById("filter-genero").value = "all";
         document.getElementById("filter-tipo-vivienda").value = "all";
         document.getElementById("filter-discapacidad-nivel").value = "all";
-        
+
         document.querySelectorAll(".filter-discapacidad-type").forEach(el => el.checked = false);
         document.querySelectorAll(".filter-profesion-item").forEach(el => el.checked = false);
-        
+
         renderPersonasTable();
     });
 
     const btnExportarExcel = document.getElementById("btn-exportar-excel");
-    if(btnExportarExcel) {
+    if (btnExportarExcel) {
         btnExportarExcel.addEventListener("click", exportarPersonasExcel);
     }
 }
@@ -542,12 +542,12 @@ function setupModalControl(openBtnId, closeBtnId, cancelBtnId, modalId) {
             modal.classList.remove("hidden");
         });
     }
-    
+
     const closeModal = () => modal.classList.add("hidden");
 
     if (closeBtn) closeBtn.addEventListener("click", closeModal);
     if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
-    
+
     modal.addEventListener("click", (e) => {
         if (e.target === modal) closeModal();
     });
@@ -624,7 +624,7 @@ async function handlePersonaSubmit(e) {
         e.target.reset();
         document.getElementById("persona-id").value = "";
         document.getElementById("modal-persona").classList.add("hidden");
-        
+
         await renderPersonasTable();
         await populateSelects();
         await renderDashboard();
@@ -652,7 +652,7 @@ async function handleFamiliaSubmit(e) {
         await uiCreateNucleo(nombreFam, viviendaId, jefeId);
         e.target.reset();
         document.getElementById("modal-familia").classList.add("hidden");
-        
+
         await renderFamilias();
         await renderPersonasTable();
         await populateSelects();
@@ -682,6 +682,7 @@ async function handleComunidadSubmit(e) {
         document.getElementById("modal-comunidad").classList.add("hidden");
         document.getElementById('modal-comunidad-title').textContent = 'Agregar Comunidad';
         await populateSelects();
+        await populateViviendaModalSelects();
         await renderViviendasTree();
     } catch (err) {
         console.error(err);
@@ -708,6 +709,8 @@ async function handleEdificioSubmit(e) {
         document.getElementById("modal-edificio").classList.add("hidden");
         document.getElementById('modal-edificio-title').textContent = 'Agregar Edificio';
         await renderViviendasTree();
+        await populateSelects();
+        await populateViviendaModalSelects();
     } catch (err) {
         console.error(err);
         showAlert("Error al guardar edificio: " + (err.message || err), "error");
@@ -751,7 +754,7 @@ async function handleAsociarPersonaFamilia(e) {
         await uiAsociarPersonaFamilia(personaId, familiaId);
         showAlert("Persona asociada al núcleo familiar.", "success");
         e.target.reset();
-        
+
         await renderFamilias();
         await renderPersonasTable();
         await populateSelects();
@@ -769,12 +772,12 @@ async function handleAsociarFamiliaVivienda(e) {
 
     try {
         const db = await dbFetchAll();
-        
+
         let targetNucleoId = selection.startsWith("fam_") ? selection.split("_")[1] : null;
 
         // Verificar si la vivienda destino ya está ocupada por otro núcleo familiar
         const isOccupied = db.nucleos.some(n => n.id_vivienda === viviendaId && n.id_nucleo !== targetNucleoId);
-        
+
         let confirmMsg = "¿Está seguro que desea trasladar al grupo a esta nueva vivienda?";
         if (isOccupied) {
             confirmMsg = "La vivienda seleccionada ya se encuentra habitada por otra familia. ¿Desea trasladarlos allí de todas formas?";
@@ -789,15 +792,15 @@ async function handleAsociarFamiliaVivienda(e) {
         } else if (selection.startsWith("per_")) {
             const personaId = selection.split("_")[1];
             const persona = db.personas.find(p => p.id_persona === personaId);
-            
+
             const newFamName = `Familia de ${persona.nombre_completo}`;
             await apiAsignarPersonaSueltaAVivienda(newFamName, viviendaId, persona.id_persona);
-            
+
             showAlert("Persona asignada a la vivienda (se creó su núcleo familiar de 1 persona).", "success");
         }
 
         e.target.reset();
-        
+
         await renderFamilias();
         await renderViviendasTree();
         await populateSelects();
@@ -821,7 +824,7 @@ async function handleCrearUsuario(e) {
         const roles = await apiGetRoles();
         const currentRole = roles.find(r => r.id_rol === currentUser.id_rol);
         const currentRoleName = currentRole ? currentRole.nombre_rol.toLowerCase() : "";
-        
+
         if (!currentRoleName.includes("administrador") && !currentRoleName.includes("admin")) {
             showAlert("Acción denegada: Solo los administradores pueden crear cuentas de usuario.", "warning");
             return;
@@ -870,7 +873,7 @@ async function handleCrearUsuario(e) {
 
         e.target.reset();
         document.getElementById("usr-comunidad-group").classList.add("hidden");
-        
+
         await renderUsuariosTable();
         await renderDashboard();
         showAlert("Cuenta de usuario creada con éxito.", "success");
@@ -891,7 +894,7 @@ async function handleEditarFamiliaSubmit(e) {
         await uiUpdateFamily(id, nombre, viviendaId, jefeId);
         e.target.reset();
         document.getElementById("modal-editar-familia").classList.add("hidden");
-        
+
         await renderFamilias();
         await renderPersonasTable();
         await populateSelects();
@@ -1007,7 +1010,7 @@ async function handleMisDatosSubmit(e) {
     e.preventDefault();
     const nombre = document.getElementById("mi-nombre").value.trim();
     const telefono = document.getElementById("mi-telefono").value.trim();
-    
+
     const nameRegex = /^[A-Za-záéíóúÁÉÍÓÚñÑ\s]+$/;
     if (!nameRegex.test(nombre)) {
         showAlert("Los nombres no pueden contener números.", "error");
@@ -1094,7 +1097,7 @@ window.editVivienda = async (id) => {
     if (!v) return;
     document.getElementById('viv-id').value = v.id_vivienda;
     document.getElementById('viv-comunidad').value = v.id_comunidad;
-    
+
     // Trigger change on comunidad to populate edificios
     const comSelect = document.getElementById('viv-comunidad');
     comSelect.dispatchEvent(new Event('change'));
