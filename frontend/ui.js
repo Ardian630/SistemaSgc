@@ -31,7 +31,15 @@ import {
     apiUpdateDiscapacidad,
     apiDeleteDiscapacidad,
     apiResetPasswordForEmail,
-    apiUpdatePassword
+    apiUpdatePassword,
+    apiUpdateMisDatos as apiUpdateMisDatosClient,
+    apiUpdateUserRole as apiUpdateUserRoleClient,
+    apiUpdateComunidad,
+    apiDeleteComunidad,
+    apiUpdateEdificio,
+    apiDeleteEdificio,
+    apiUpdateVivienda,
+    apiDeleteVivienda
 } from "./supabase-client.js";
 
 import { getCurrentUser } from "./auth.js";
@@ -175,6 +183,8 @@ export async function renderDashboard() {
         `;
         listContainer.appendChild(card);
     });
+    
+    await applyRoleUI_Restrictions();
 }
 
 // =========================================================================
@@ -230,67 +240,7 @@ export async function renderPersonasTable() {
 
     body.innerHTML = "";
 
-    const filterText = document.getElementById("filter-cedula").value.toLowerCase().trim();
-    const filterAgeMin = document.getElementById("filter-edad-min").value;
-    const filterAgeMax = document.getElementById("filter-edad-max").value;
-    const filterGen = document.getElementById("filter-genero").value;
-    const filterHomeType = document.getElementById("filter-tipo-vivienda").value;
-    const filterDiscNivel = document.getElementById("filter-discapacidad-nivel").value;
-
-    const selectedDisabilities = Array.from(document.querySelectorAll(".filter-discapacidad-type:checked")).map(el => el.value);
-    const selectedProfessions = Array.from(document.querySelectorAll(".filter-profesion-item:checked")).map(el => el.value);
-
-    const currentYear = new Date().getFullYear();
-
-    const filtered = db.personas.filter(p => {
-        if (activeCommunity !== "all") {
-            const family = db.nucleos.find(n => n.id_nucleo === p.id_nucleo);
-            if (!family) return false;
-            const housing = db.viviendas.find(v => v.id_vivienda === family.id_vivienda);
-            if (!housing || housing.id_comunidad !== activeCommunity) return false;
-        }
-
-        if (filterText) {
-            const matchCed = p.cedula_identidad.includes(filterText);
-            const matchName = p.nombre_completo.toLowerCase().includes(filterText);
-            if (!matchCed && !matchName) return false;
-        }
-
-        const birthYear = new Date(p.fecha_nacimiento).getFullYear();
-        const age = currentYear - birthYear;
-        if (filterAgeMin && age < parseInt(filterAgeMin)) return false;
-        if (filterAgeMax && age > parseInt(filterAgeMax)) return false;
-
-        if (filterGen !== "all" && p.genero !== filterGen) return false;
-
-        if (filterHomeType !== "all") {
-            const family = db.nucleos.find(n => n.id_nucleo === p.id_nucleo);
-            if (!family || !family.id_vivienda) return false;
-            const housing = db.viviendas.find(v => v.id_vivienda === family.id_vivienda);
-            if (!housing) return false;
-            
-            if (filterHomeType === "casa" && housing.id_edificio !== null) return false;
-            if (filterHomeType === "apartamento" && housing.id_edificio === null) return false;
-        }
-
-        if (selectedDisabilities.length > 0) {
-            if (p.id_discapacidad === null) return false;
-            const discObj = db.discapacidades.find(d => d.id_discapacidad === p.id_discapacidad);
-            if (!discObj || !selectedDisabilities.includes(discObj.tipo_discapacidad)) return false;
-        }
-
-        if (filterDiscNivel !== "all") {
-            if (p.id_discapacidad === null) return false;
-            const discObj = db.discapacidades.find(d => d.id_discapacidad === p.id_discapacidad);
-            if (!discObj || discObj.nivel_discapacidad !== filterDiscNivel) return false;
-        }
-
-        if (selectedProfessions.length > 0) {
-            if (p.id_profesion === null || !selectedProfessions.includes(p.id_profesion)) return false;
-        }
-
-        return true;
-    });
+    const filtered = getFilteredPersonas(db);
 
     if (filtered.length === 0) {
         table.classList.add("hidden");
@@ -300,6 +250,8 @@ export async function renderPersonasTable() {
 
     table.classList.remove("hidden");
     emptyState.classList.add("hidden");
+
+    const currentYear = new Date().getFullYear();
 
     filtered.forEach(p => {
         const birthYear = new Date(p.fecha_nacimiento).getFullYear();
@@ -381,6 +333,7 @@ export async function renderPersonasTable() {
             uiDeletePersona(id);
         });
     });
+    await applyRoleUI_Restrictions();
 }
 
 // =========================================================================
@@ -483,6 +436,7 @@ export async function renderFamilias() {
     });
 
     populateSelects();
+    await applyRoleUI_Restrictions();
 }
 
 export async function renderViviendasTree() {
@@ -500,13 +454,25 @@ export async function renderViviendasTree() {
     activeComs.forEach(c => {
         const comNode = document.createElement("div");
         comNode.className = "tree-node root";
-        comNode.innerHTML = `<span class="tree-node-title">Comunidad: ${c.nombre_comunidad}</span>`;
+        comNode.innerHTML = `
+            <span class="tree-node-title">Comunidad: ${c.nombre_comunidad}
+                <span style="margin-left: 10px; font-weight: normal;">
+                    <a href="#" onclick="event.preventDefault(); window.editComunidad('${c.id_comunidad}')" style="color: var(--primary); margin-right: 8px; text-decoration: none; font-size: 18px;" title="Editar">✎</a>
+                    <a href="#" onclick="event.preventDefault(); window.deleteComunidad('${c.id_comunidad}')" style="color: #dc2626; text-decoration: none; font-size: 18px;" title="Borrar">🗑</a>
+                </span>
+            </span>`;
 
         const commEdifs = db.edificios.filter(e => e.id_comunidad === c.id_comunidad);
         commEdifs.forEach(e => {
             const edifNode = document.createElement("div");
             edifNode.className = "tree-node";
-            edifNode.innerHTML = `<span class="tree-node-title">Edificio: ${e.nombre_edificio}</span>`;
+            edifNode.innerHTML = `
+                <span class="tree-node-title">Edificio: ${e.nombre_edificio}
+                    <span style="margin-left: 10px; font-weight: normal;">
+                        <a href="#" onclick="event.preventDefault(); window.editEdificio('${e.id_edificio}')" style="color: var(--primary); margin-right: 8px; text-decoration: none; font-size: 18px;" title="Editar">✎</a>
+                        <a href="#" onclick="event.preventDefault(); window.deleteEdificio('${e.id_edificio}')" style="color: #dc2626; text-decoration: none; font-size: 18px;" title="Borrar">🗑</a>
+                    </span>
+                </span>`;
 
             const edifViviendas = db.viviendas.filter(v => v.id_edificio === e.id_edificio);
             edifViviendas.forEach(v => {
@@ -516,7 +482,13 @@ export async function renderViviendasTree() {
                 const vFamilies = db.nucleos.filter(n => n.id_vivienda === v.id_vivienda);
                 const famNames = vFamilies.map(n => n.nombre_familia).join(", ") || "Desocupada";
                 
-                vivNode.innerHTML = `<span class="tree-node-title" style="font-weight: normal;">Vivienda: ${v.numero_vivienda} (${famNames})</span>`;
+                vivNode.innerHTML = `
+                    <span class="tree-node-title" style="font-weight: normal;">Vivienda: ${v.numero_vivienda} (${famNames})
+                        <span style="margin-left: 10px; font-weight: normal;">
+                            <a href="#" onclick="event.preventDefault(); window.editVivienda('${v.id_vivienda}')" style="color: var(--primary); margin-right: 8px; text-decoration: none; font-size: 18px;" title="Editar">✎</a>
+                            <a href="#" onclick="event.preventDefault(); window.deleteVivienda('${v.id_vivienda}')" style="color: #dc2626; text-decoration: none; font-size: 18px;" title="Borrar">🗑</a>
+                        </span>
+                    </span>`;
                 edifNode.appendChild(vivNode);
             });
 
@@ -531,12 +503,20 @@ export async function renderViviendasTree() {
             const vFamilies = db.nucleos.filter(n => n.id_vivienda === v.id_vivienda);
             const famNames = vFamilies.map(n => n.nombre_familia).join(", ") || "Desocupada";
             
-            houseNode.innerHTML = `<span class="tree-node-title" style="font-weight: normal; background-color: rgba(16, 185, 129, 0.05);">Casa: ${v.numero_vivienda} (${famNames})</span>`;
+            houseNode.innerHTML = `
+                <span class="tree-node-title" style="font-weight: normal; background-color: rgba(16, 185, 129, 0.05);">Casa: ${v.numero_vivienda} (${famNames})
+                    <span style="margin-left: 10px; font-weight: normal;">
+                        <a href="#" onclick="event.preventDefault(); window.editVivienda('${v.id_vivienda}')" style="color: var(--primary); margin-right: 8px; text-decoration: none; font-size: 18px;" title="Editar">✎</a>
+                        <a href="#" onclick="event.preventDefault(); window.deleteVivienda('${v.id_vivienda}')" style="color: #dc2626; text-decoration: none; font-size: 18px;" title="Borrar">🗑</a>
+                    </span>
+                </span>`;
             comNode.appendChild(houseNode);
         });
 
         tree.appendChild(comNode);
     });
+
+    await applyRoleUI_Restrictions();
 }
 
 // =========================================================================
@@ -547,7 +527,13 @@ export async function renderUsuariosTable() {
     const db = await dbFetchAll();
     const currentUser = getCurrentUser();
     
+    // Lider no puede ver o administrar usuarios
+    if (currentUser?.nombre_rol?.toLowerCase().includes("lider")) {
+        return;
+    }
+    
     const body = document.getElementById("usuarios-table-body");
+    if (!body) return;
     body.innerHTML = "";
 
     const filteredUsrs = activeCommunity === "all" ? db.usuarios : db.usuarios.filter(u => u.id_comunidad === activeCommunity || u.id_comunidad === null);
@@ -576,12 +562,25 @@ export async function renderUsuariosTable() {
             }
         }
 
+        let showEditRole = false;
+        if (currentUser.id_rol === adminRole?.id_rol || currentUser.id_rol === "r-1") {
+            if (u.id_usuario !== currentUser.id_usuario) showEditRole = true;
+        } else if (currentUser.id_rol === weakRole?.id_rol || currentUser.id_rol === "r-4") {
+            if (u.id_rol !== adminRole?.id_rol && u.id_rol !== "r-1" && u.id_rol !== weakRole?.id_rol && u.id_rol !== "r-4") {
+                showEditRole = true;
+            }
+        }
+
         let buttonHtml = "";
         if (showDelete) {
-            buttonHtml = `<button class="btn btn-secondary btn-delete-user" data-id="${u.id_usuario}"
+            buttonHtml += `<button class="btn btn-secondary btn-delete-user" data-id="${u.id_usuario}"
                             ${deleteDisabled ? 'disabled title="' + tooltipText + '" style="opacity: 0.5; cursor: not-allowed;"' : ''}>Eliminar</button>`;
         } else {
-            buttonHtml = `<span style="color: var(--text-muted); font-size: 11px;">Sesión Activa</span>`;
+            buttonHtml += `<span style="color: var(--text-muted); font-size: 11px;">Sesión Activa</span>`;
+        }
+
+        if (showEditRole) {
+            buttonHtml += ` <button class="btn btn-outline btn-edit-user-role" data-id="${u.id_usuario}" style="padding: 4px 8px; font-size: 11px; margin-left: 4px;">Editar Rol</button>`;
         }
 
         const tr = document.createElement("tr");
@@ -607,6 +606,15 @@ export async function renderUsuariosTable() {
             uiDeleteUsuario(id);
         });
     });
+
+    // Wire edit role
+    document.querySelectorAll(".btn-edit-user-role").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+            const id = e.target.getAttribute("data-id");
+            uiOpenEditRoleModal(id);
+        });
+    });
+    await applyRoleUI_Restrictions();
 }
 
 // =========================================================================
@@ -616,19 +624,60 @@ export async function renderUsuariosTable() {
 export async function populateSelects() {
     const db = await dbFetchAll();
     
+    const currentUser = getCurrentUser();
+    const userRole = db.roles.find(r => r.id_rol === currentUser?.id_rol);
+    const roleName = userRole ? userRole.nombre_rol.toLowerCase() : "";
+    const isLider = roleName.includes("lider") || roleName.includes("líder");
+
     const activeCommSelect = document.getElementById("active-community-select");
     const currentVal = activeCommSelect.value;
-    activeCommSelect.innerHTML = `<option value="all">Todas las Comunidades</option>`;
-    db.comunidades.forEach(c => {
-        activeCommSelect.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
-    });
-    activeCommSelect.value = currentVal || "all";
+    
+    if (isLider && currentUser.id_comunidad) {
+        activeCommSelect.innerHTML = "";
+        const c = db.comunidades.find(x => x.id_comunidad === currentUser.id_comunidad);
+        if (c) activeCommSelect.innerHTML = `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
+        activeCommSelect.value = currentUser.id_comunidad;
+        activeCommSelect.disabled = true;
+        window.activeCommunity = currentUser.id_comunidad;
+    } else {
+        activeCommSelect.innerHTML = `<option value="all">Todas las Comunidades</option>`;
+        db.comunidades.forEach(c => {
+            activeCommSelect.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
+        });
+        activeCommSelect.value = currentVal || "all";
+        activeCommSelect.disabled = false;
+    }
 
     const usrCommSelect = document.getElementById("usr-comunidad");
-    usrCommSelect.innerHTML = `<option value="">Sin comunidad</option>`;
-    db.comunidades.forEach(c => {
-        usrCommSelect.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
-    });
+    if (usrCommSelect) {
+        usrCommSelect.innerHTML = `<option value="">Sin comunidad</option>`;
+        db.comunidades.forEach(c => {
+            usrCommSelect.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
+        });
+    }
+
+    const regCommSelect = document.getElementById("reg-comunidad");
+    if(regCommSelect) {
+        regCommSelect.innerHTML = `<option value="">Ninguna / No aplica</option>`;
+        db.comunidades.forEach(c => {
+            regCommSelect.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
+        });
+    }
+
+    const edfCommSelect = document.getElementById("edf-comunidad");
+    if(edfCommSelect) {
+        edfCommSelect.innerHTML = `<option value="">Seleccione comunidad...</option>`;
+        db.comunidades.forEach(c => {
+            if (isLider && currentUser.id_comunidad && c.id_comunidad !== currentUser.id_comunidad) return;
+            edfCommSelect.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
+        });
+        if (isLider && currentUser.id_comunidad) {
+            edfCommSelect.value = currentUser.id_comunidad;
+            edfCommSelect.disabled = true;
+        } else {
+            edfCommSelect.disabled = false;
+        }
+    }
 
     const assocPersonaSelect = document.getElementById("asociar-persona-select");
     assocPersonaSelect.innerHTML = `<option value="">Seleccione una persona...</option>`;
@@ -643,14 +692,48 @@ export async function populateSelects() {
     });
 
     const assocFamVivSelect = document.getElementById("vivienda-asoc-familia");
-    assocFamVivSelect.innerHTML = `<option value="">Seleccione núcleo familiar...</option>`;
-    db.nucleos.forEach(n => {
-        assocFamVivSelect.innerHTML += `<option value="${n.id_nucleo}">${n.nombre_familia}</option>`;
+    assocFamVivSelect.innerHTML = `<option value="">Seleccione núcleo o persona suelta...</option>`;
+    
+    let filteredNucleosForAssoc = db.nucleos;
+    if (isLider) {
+        if (currentUser.id_comunidad) {
+            filteredNucleosForAssoc = db.nucleos.filter(n => {
+                if (!n.id_vivienda) return true;
+                const viv = db.viviendas.find(v => v.id_vivienda === n.id_vivienda);
+                return viv && viv.id_comunidad === currentUser.id_comunidad;
+            });
+        } else {
+            filteredNucleosForAssoc = [];
+        }
+    }
+
+    const optGroupFam = document.createElement("optgroup");
+    optGroupFam.label = "Núcleos Familiares";
+    filteredNucleosForAssoc.forEach(n => {
+        optGroupFam.innerHTML += `<option value="fam_${n.id_nucleo}">${n.nombre_familia}</option>`;
     });
+    assocFamVivSelect.appendChild(optGroupFam);
+
+    const optGroupPers = document.createElement("optgroup");
+    optGroupPers.label = "Personas sueltas (Creará núcleo de 1)";
+    db.personas.filter(p => p.id_nucleo === null).forEach(p => {
+        optGroupPers.innerHTML += `<option value="per_${p.id_persona}">${p.nombre_completo}</option>`;
+    });
+    assocFamVivSelect.appendChild(optGroupPers);
 
     const assocVivSelect = document.getElementById("vivienda-asoc-vivienda");
     assocVivSelect.innerHTML = `<option value="">Seleccione vivienda...</option>`;
-    db.viviendas.forEach(v => {
+    
+    let filteredViviendasForAssoc = db.viviendas;
+    if (isLider) {
+        if (currentUser.id_comunidad) {
+            filteredViviendasForAssoc = db.viviendas.filter(v => v.id_comunidad === currentUser.id_comunidad);
+        } else {
+            filteredViviendasForAssoc = [];
+        }
+    }
+    
+    filteredViviendasForAssoc.forEach(v => {
         const comm = db.comunidades.find(c => c.id_comunidad === v.id_comunidad);
         const edif = v.id_edificio ? db.edificios.find(e => e.id_edificio === v.id_edificio) : null;
         const text = `${comm ? comm.nombre_comunidad : 'S/C'} - ${v.numero_vivienda} ${edif ? '(' + edif.nombre_edificio + ')' : '(Casa)'}`;
@@ -694,10 +777,55 @@ export async function populatePersonaModalSelects() {
     });
 
     const nucSelect = document.getElementById("persona-nucleo");
-    nucSelect.innerHTML = `<option value="">Ninguno - Registrar suelto</option>`;
-    db.nucleos.forEach(n => {
-        nucSelect.innerHTML += `<option value="${n.id_nucleo}">${n.nombre_familia}</option>`;
+    nucSelect.innerHTML = "";
+    
+    const { getCurrentUser } = await import('./auth.js').catch(() => window);
+    const currentUser = getCurrentUser ? getCurrentUser() : null;
+    const userRole = currentUser ? db.roles.find(r => r.id_rol === currentUser.id_rol) : null;
+    const roleName = userRole ? userRole.nombre_rol.toLowerCase() : "";
+    const isLider = roleName.includes("lider");
+
+    if (!isLider) {
+        nucSelect.innerHTML += `<option value="">Ninguno - Registrar suelto</option>`;
+        nucSelect.required = false;
+    } else {
+        nucSelect.innerHTML += `<option value="">Seleccione a dónde asociar...</option>`;
+        nucSelect.required = true;
+    }
+
+    let filteredNucleos = db.nucleos;
+    let filteredViviendas = db.viviendas;
+
+    if (isLider) {
+        if (currentUser.id_comunidad) {
+            filteredViviendas = db.viviendas.filter(v => v.id_comunidad === currentUser.id_comunidad);
+            filteredNucleos = db.nucleos.filter(n => {
+                if (!n.id_vivienda) return true;
+                const viv = db.viviendas.find(v => v.id_vivienda === n.id_vivienda);
+                return viv && viv.id_comunidad === currentUser.id_comunidad;
+            });
+        } else {
+            filteredViviendas = [];
+            filteredNucleos = [];
+        }
+    }
+
+    const optGroupFam = document.createElement("optgroup");
+    optGroupFam.label = "Núcleos Familiares";
+    filteredNucleos.forEach(n => {
+        optGroupFam.innerHTML += `<option value="fam_${n.id_nucleo}">${n.nombre_familia}</option>`;
     });
+    nucSelect.appendChild(optGroupFam);
+
+    const optGroupViv = document.createElement("optgroup");
+    optGroupViv.label = "Viviendas (Creará núcleo propio)";
+    filteredViviendas.forEach(v => {
+        const comm = db.comunidades.find(c => c.id_comunidad === v.id_comunidad);
+        const edif = v.id_edificio ? db.edificios.find(e => e.id_edificio === v.id_edificio) : null;
+        const text = `${comm ? comm.nombre_comunidad : 'S/C'} - ${v.numero_vivienda} ${edif ? '(' + edif.nombre_edificio + ')' : '(Casa)'}`;
+        optGroupViv.innerHTML += `<option value="viv_${v.id_vivienda}">${text}</option>`;
+    });
+    nucSelect.appendChild(optGroupViv);
 }
 
 export async function populateFamiliaModalSelects() {
@@ -725,16 +853,28 @@ export async function populateFamiliaModalSelects() {
 
 export async function populateViviendaModalSelects() {
     const db = await dbFetchAll();
-    
+    const currentUser = getCurrentUser();
+    const userRole = db.roles.find(r => r.id_rol === currentUser?.id_rol);
+    const roleName = userRole ? userRole.nombre_rol.toLowerCase() : "";
+    const isLider = roleName.includes("lider") || roleName.includes("líder");
+
     const comSelectViv = document.getElementById("viv-comunidad");
     const edSelectViv = document.getElementById("viv-edificio");
     
     comSelectViv.innerHTML = `<option value="">Seleccione comunidad...</option>`;
     db.comunidades.forEach(c => {
+        if (isLider && currentUser.id_comunidad && c.id_comunidad !== currentUser.id_comunidad) return;
         comSelectViv.innerHTML += `<option value="${c.id_comunidad}">${c.nombre_comunidad}</option>`;
     });
 
-    comSelectViv.addEventListener("change", (e) => {
+    if (isLider && currentUser.id_comunidad) {
+        comSelectViv.value = currentUser.id_comunidad;
+        comSelectViv.disabled = true;
+    } else {
+        comSelectViv.disabled = false;
+    }
+
+    comSelectViv.onchange = (e) => {
         const selComId = e.target.value;
         edSelectViv.innerHTML = `<option value="">Ninguno (Es una Casa)</option>`;
         if (selComId) {
@@ -742,7 +882,9 @@ export async function populateViviendaModalSelects() {
                 edSelectViv.innerHTML += `<option value="${edf.id_edificio}">${edf.nombre_edificio}</option>`;
             });
         }
-    });
+    };
+    // Disparar para cargar los edificios iniciales
+    comSelectViv.dispatchEvent(new Event("change"));
 }
 
 // =========================================================================
@@ -750,7 +892,7 @@ export async function populateViviendaModalSelects() {
 // =========================================================================
 
 export async function uiCreatePersona(persona) {
-    await apiCreatePersona(persona);
+    return await apiCreatePersona(persona);
 }
 
 export async function uiUpdatePersona(id, personaData) {
@@ -830,6 +972,45 @@ export async function uiCreateVivienda(idComunidad, idEdificio, numero, bloque) 
         throw new Error("Ya existe una vivienda con este número en el edificio o comunidad seleccionada.");
     }
     await apiCreateVivienda(idComunidad, idEdificio, numero, bloque);
+}
+
+export async function uiUpdateComunidad(id, nombre) {
+    await apiUpdateComunidad(id, nombre);
+}
+
+export async function uiDeleteComunidad(id) {
+    await apiDeleteComunidad(id);
+}
+
+export async function uiUpdateEdificio(id, idComunidad, nombre) {
+    const edificios = await apiGetEdificios();
+    const nameLower = nombre.trim().toLowerCase();
+    const existe = edificios.some(ed => ed.id_comunidad === idComunidad && ed.nombre_edificio.toLowerCase() === nameLower && ed.id_edificio !== id);
+    if (existe) throw new Error("Ya existe un edificio/casa con este nombre en esta comunidad.");
+    
+    await apiUpdateEdificio(id, idComunidad, nombre);
+}
+
+export async function uiDeleteEdificio(id) {
+    await apiDeleteEdificio(id);
+}
+
+export async function uiUpdateVivienda(id, idComunidad, idEdificio, numero, bloque) {
+    const viviendas = await apiGetViviendas();
+    const numLower = numero.trim().toLowerCase();
+    const existe = viviendas.some(v => 
+        v.id_comunidad === idComunidad && 
+        v.id_edificio === (idEdificio || null) && 
+        v.numero_vivienda.toLowerCase() === numLower &&
+        v.id_vivienda !== id
+    );
+    if (existe) throw new Error("Ya existe una vivienda con este número en el edificio o comunidad seleccionada.");
+    
+    await apiUpdateVivienda(id, idComunidad, idEdificio, numero, bloque);
+}
+
+export async function uiDeleteVivienda(id) {
+    await apiDeleteVivienda(id);
 }
 
 export async function uiAsociarPersonaFamilia(personaId, familiaId) {
@@ -1074,6 +1255,7 @@ export async function renderParametros() {
             }
         });
     });
+    await applyRoleUI_Restrictions();
 }
 
 export async function uiSaveProfesion(id, nombre) {
@@ -1261,3 +1443,260 @@ export async function renderCharts() {
     });
 }
 
+// Exportado desde ui.js para que app.js lo pueda usar si es necesario
+export function getFilteredPersonas(db) {
+    const filterText = document.getElementById("filter-cedula")?.value.toLowerCase().trim() || "";
+    const filterAgeMin = document.getElementById("filter-edad-min")?.value || "";
+    const filterAgeMax = document.getElementById("filter-edad-max")?.value || "";
+    const filterGen = document.getElementById("filter-genero")?.value || "all";
+    const filterHomeType = document.getElementById("filter-tipo-vivienda")?.value || "all";
+    const filterDiscNivel = document.getElementById("filter-discapacidad-nivel")?.value || "all";
+
+    const selectedDisabilities = Array.from(document.querySelectorAll(".filter-discapacidad-type:checked")).map(el => el.value);
+    const selectedProfessions = Array.from(document.querySelectorAll(".filter-profesion-item:checked")).map(el => el.value);
+
+    const currentYear = new Date().getFullYear();
+
+    return db.personas.filter(p => {
+        if (typeof activeCommunity !== 'undefined' && activeCommunity !== "all") {
+            const family = db.nucleos.find(n => n.id_nucleo === p.id_nucleo);
+            if (!family) return false;
+            const housing = db.viviendas.find(v => v.id_vivienda === family.id_vivienda);
+            if (!housing || housing.id_comunidad !== activeCommunity) return false;
+        }
+
+        if (filterText) {
+            const matchCed = p.cedula_identidad.includes(filterText);
+            const matchName = p.nombre_completo.toLowerCase().includes(filterText);
+            if (!matchCed && !matchName) return false;
+        }
+
+        const birthYear = new Date(p.fecha_nacimiento).getFullYear();
+        const age = currentYear - birthYear;
+        if (filterAgeMin && age < parseInt(filterAgeMin)) return false;
+        if (filterAgeMax && age > parseInt(filterAgeMax)) return false;
+
+        if (filterGen !== "all" && p.genero !== filterGen) return false;
+
+        if (filterHomeType !== "all") {
+            const family = db.nucleos.find(n => n.id_nucleo === p.id_nucleo);
+            if (!family || !family.id_vivienda) return false;
+            const housing = db.viviendas.find(v => v.id_vivienda === family.id_vivienda);
+            if (!housing) return false;
+            
+            if (filterHomeType === "casa" && housing.id_edificio !== null) return false;
+            if (filterHomeType === "apartamento" && housing.id_edificio === null) return false;
+        }
+
+        if (selectedDisabilities.length > 0) {
+            if (p.id_discapacidad === null) return false;
+            const discObj = db.discapacidades.find(d => d.id_discapacidad === p.id_discapacidad);
+            if (!discObj || !selectedDisabilities.includes(discObj.tipo_discapacidad)) return false;
+        }
+
+        if (filterDiscNivel !== "all") {
+            if (p.id_discapacidad === null) return false;
+            const discObj = db.discapacidades.find(d => d.id_discapacidad === p.id_discapacidad);
+            if (!discObj || discObj.nivel_discapacidad !== filterDiscNivel) return false;
+        }
+
+        if (selectedProfessions.length > 0) {
+            if (p.id_profesion === null || !selectedProfessions.includes(p.id_profesion)) return false;
+        }
+
+        return true;
+    });
+}
+
+export async function exportarPersonasExcel() {
+    const db = await dbFetchAll();
+    const personasFiltradas = getFilteredPersonas(db);
+    
+    if (personasFiltradas.length === 0) {
+        if(window.showNotification) window.showNotification("No hay datos para exportar con los filtros actuales.", "warning");
+        else alert("No hay datos para exportar con los filtros actuales.");
+        return;
+    }
+
+    const currentYear = new Date().getFullYear();
+
+    // Mapear los datos para que el Excel tenga las columnas limpias y legibles
+    const datosExcel = personasFiltradas.map(p => {
+        const profesion = db.profesiones.find(pr => pr.id_profesion === p.id_profesion)?.nombre_profesion || 'Ninguna';
+        
+        let discapacidadTxt = 'Ninguna';
+        if (p.id_discapacidad) {
+            const disc = db.discapacidades.find(d => d.id_discapacidad === p.id_discapacidad);
+            if (disc) discapacidadTxt = `${disc.tipo_discapacidad} (${disc.nivel_discapacidad})`;
+        }
+
+        let viviendaTxt = 'Sin Vivienda';
+        let comunidadTxt = 'Sin Comunidad';
+        if (p.id_nucleo) {
+            const nucleo = db.nucleos.find(n => n.id_nucleo === p.id_nucleo);
+            if (nucleo && nucleo.id_vivienda) {
+                const vivienda = db.viviendas.find(v => v.id_vivienda === nucleo.id_vivienda);
+                if (vivienda) {
+                    viviendaTxt = `Casa/Apto ${vivienda.numero_vivienda}`;
+                    const comunidad = db.comunidades.find(c => c.id_comunidad === vivienda.id_comunidad);
+                    if (comunidad) comunidadTxt = comunidad.nombre_comunidad;
+                }
+            }
+        }
+
+        const birthYear = new Date(p.fecha_nacimiento).getFullYear();
+        const edad = currentYear - birthYear;
+        
+        return {
+            "Cédula": `${p.tipo_cedula}-${p.cedula_identidad}`,
+            "Nombre Completo": p.nombre_completo,
+            "Edad": edad,
+            "Género": p.genero,
+            "Teléfono": p.telefono || 'N/A',
+            "Email": p.email || 'N/A',
+            "Profesión/Oficio": profesion,
+            "Condición de Salud": discapacidadTxt,
+            "Comunidad": comunidadTxt,
+            "Vivienda": viviendaTxt
+        };
+    });
+
+    if (typeof XLSX === "undefined") {
+        if(window.showNotification) window.showNotification("La librería para exportar Excel no está cargada.", "error");
+        else alert("La librería para exportar Excel no está cargada.");
+        return;
+    }
+
+    // Crear la hoja de trabajo y el libro de Excel
+    const worksheet = XLSX.utils.json_to_sheet(datosExcel);
+    
+    // Ajustar el ancho de cada columna para que el texto encaje
+    worksheet['!cols'] = [
+        { wch: 15 }, // Cédula
+        { wch: 35 }, // Nombre Completo
+        { wch: 8 },  // Edad
+        { wch: 12 }, // Género
+        { wch: 15 }, // Teléfono
+        { wch: 30 }, // Email
+        { wch: 30 }, // Profesión/Oficio
+        { wch: 35 }, // Condición de Salud
+        { wch: 30 }, // Comunidad
+        { wch: 25 }  // Vivienda
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Censo de Habitantes");
+
+    // Forzar la descarga del archivo
+    XLSX.writeFile(workbook, "Censo_Habitantes_Filtrado.xlsx");
+}
+
+// =========================================================================
+// EDICIÓN DE PERFIL Y ROLES
+// =========================================================================
+
+export async function uiUpdateMisDatos(nombre, telefono) {
+    const { getCurrentUser, dbFetchAll } = await import('./auth.js').catch(() => window);
+    const currentUser = getCurrentUser ? getCurrentUser() : null; // auth.js exporta getCurrentUser o lo obtenemos del store
+    
+    if (!currentUser) throw new Error("No hay usuario autenticado.");
+
+    await apiUpdateMisDatosClient(currentUser.id_usuario, nombre, telefono);
+        
+    // Actualizamos currentUser en el DOM
+    const nameEl = document.getElementById("current-user-name");
+    if (nameEl) nameEl.textContent = nombre;
+}
+
+export async function uiOpenEditRoleModal(id_usuario) {
+    const db = await dbFetchAll(); // dbFetchAll es global o importado en app.js pero acá no lo tengo directo a menos que lo exporte, pero ya lo tengo arriba (dbFetchAll es una funcion exportada en ui.js? No, está en auth.js o data.js. Arriba se usó dbFetchAll).
+    const currentUser = getCurrentUser();
+    
+    const u = db.usuarios.find(x => x.id_usuario === id_usuario);
+    if(!u) return;
+
+    document.getElementById("edit-usr-id").value = u.id_usuario;
+    document.getElementById("edit-usr-nombre").textContent = u.nombre_completo;
+
+    const selectRole = document.getElementById("edit-usr-rol");
+    selectRole.innerHTML = '<option value="">Seleccione un rol...</option>';
+    
+    const adminRole = db.roles.find(r => r.nombre_rol === "Administrador");
+    const weakRole = db.roles.find(r => r.nombre_rol === "administrador_debil");
+
+    db.roles.forEach(r => {
+        // Lógica jerárquica para las opciones del select
+        if (currentUser.id_rol === weakRole?.id_rol || currentUser.id_rol === "r-4") {
+            if (r.id_rol === adminRole?.id_rol || r.id_rol === "r-1" || r.id_rol === weakRole?.id_rol || r.id_rol === "r-4") {
+                return; // Admin_debil no puede asignar rol de Administrador ni otro Administrador_debil
+            }
+        }
+        selectRole.innerHTML += `<option value="${r.id_rol}">${r.nombre_rol}</option>`;
+    });
+
+    selectRole.value = u.id_rol;
+
+    document.getElementById("modal-editar-rol").classList.remove("hidden");
+}
+
+export async function uiUpdateUserRole(id_usuario, new_role_id) {
+    await apiUpdateUserRoleClient(id_usuario, new_role_id);
+    
+    document.getElementById("modal-editar-rol").classList.add("hidden");
+    showAlert("Rol actualizado correctamente.", "success");
+    
+    if (window.renderUsuariosTable) await window.renderUsuariosTable();
+}
+// =========================================================================
+// RESTRICCIONES VISUALES (CONSULTOR / LÍDER)
+// =========================================================================
+
+export async function applyRoleUI_Restrictions() {
+    const db = await dbFetchAll();
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const userRole = db.roles.find(r => r.id_rol === currentUser.id_rol);
+    const roleName = userRole ? userRole.nombre_rol.toLowerCase() : "";
+
+    const isConsultor = roleName.includes("consultor");
+    const isLider = roleName.includes("lider") || roleName.includes("líder");
+
+    if (isConsultor) {
+        // Ocultar botones de registro globales
+        const createBtns = [
+            "btn-open-persona-modal",
+            "btn-open-family-modal",
+            "btn-open-comunidad-modal",
+            "btn-open-edificio-modal",
+            "btn-open-vivienda-modal"
+        ];
+        createBtns.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.style.display = "none";
+        });
+
+        // Ocultar formularios de carga y asignación (las tarjetas completas)
+        const cardsToHide = document.querySelectorAll(".family-form-card, .viviendas-action-card");
+        cardsToHide.forEach(card => card.style.display = "none");
+
+        // Ocultar botones de edición y eliminación (enlaces ✎ y 🗑)
+        const actionLinks = document.querySelectorAll("a[onclick*='edit'], a[onclick*='delete'], button[onclick*='uiDelete'], button[onclick*='uiOpenEdit']");
+        actionLinks.forEach(el => el.style.display = "none");
+
+        const actionBtns = document.querySelectorAll(".btn-delete-user, .btn-edit-user-role");
+        actionBtns.forEach(el => el.style.display = "none");
+    }
+
+    if (isLider) {
+        // Un líder no puede crear ni editar comunidades globales
+        const comBtn = document.getElementById("btn-open-comunidad-modal");
+        if (comBtn) comBtn.style.display = "none";
+        
+        const deleteComLinks = document.querySelectorAll("a[onclick*='deleteComunidad']");
+        deleteComLinks.forEach(el => el.style.display = "none");
+
+        const editComLinks = document.querySelectorAll("a[onclick*='editComunidad']");
+        editComLinks.forEach(el => el.style.display = "none");
+    }
+}

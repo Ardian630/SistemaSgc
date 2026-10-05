@@ -16,6 +16,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 
 <body>
@@ -57,6 +58,13 @@
                 <div class="form-group">
                     <label for="reg-telefono">Teléfono</label>
                     <input type="text" id="reg-telefono" placeholder="0412-1234567">
+                </div>
+                <div class="form-group">
+                    <label for="reg-comunidad">Comunidad a la que pertenece (Opcional)</label>
+                    <select id="reg-comunidad">
+                        <option value="">Ninguna / No aplica</option>
+                        <!-- Cargado dinámicamente -->
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="reg-password">Contraseña *</label>
@@ -426,6 +434,10 @@
                                 style="display: flex; align-items: center; gap: 6px;">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg> Ver Reporte Gráfico
                             </button>
+                            <button class="btn btn-outline" id="btn-exportar-excel"
+                                style="display: flex; align-items: center; gap: 6px; border-color: #107c41; color: #107c41;">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Exportar Excel
+                            </button>
                             <button class="btn btn-primary" id="btn-open-persona-modal">
                                 <span class="btn-icon">+</span> Registrar Persona
                             </button>
@@ -646,46 +658,7 @@
                             consultores.</p>
                     </div>
 
-                    <div class="families-layout">
-                        <!-- Formulario para crear usuario -->
-                        <div class="family-form-card card-visual">
-                            <h4>Crear Nuevo Usuario</h4>
-                            <form id="form-crear-usuario" class="styled-form">
-                                <div class="form-group">
-                                    <label for="usr-nombre">Nombre Completo *</label>
-                                    <input type="text" id="usr-nombre" required placeholder="Ej. Juan Pérez">
-                                </div>
-                                <div class="form-group">
-                                    <label for="usr-email">Email *</label>
-                                    <input type="email" id="usr-email" required placeholder="juan@sgc.com">
-                                </div>
-                                <div class="form-group">
-                                    <label for="usr-telefono">Teléfono</label>
-                                    <input type="text" id="usr-telefono" placeholder="0412-1234567">
-                                </div>
-                                <div class="form-group">
-                                    <label for="usr-rol">Rol *</label>
-                                    <select id="usr-rol" required>
-                                        <option value="">Seleccione un rol...</option>
-                                        <option value="r-2">Líder de comunidad</option>
-                                        <option value="r-3">Consultor</option>
-                                        <option value="r-4">Administrador Débil</option>
-                                    </select>
-                                </div>
-                                <div class="form-group hidden" id="usr-comunidad-group">
-                                    <label for="usr-comunidad">Comunidad Asignada</label>
-                                    <select id="usr-comunidad">
-                                        <option value="">Sin comunidad</option>
-                                        <!-- Cargado dinámicamente -->
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="usr-password">Contraseña temporal *</label>
-                                    <input type="password" id="usr-password" required placeholder="••••••••">
-                                </div>
-                                <button type="submit" class="btn btn-primary btn-full">Crear Cuenta</button>
-                            </form>
-                        </div>
+                    <div class="families-layout" style="grid-template-columns: 1fr;">
 
                         <!-- Listado de usuarios -->
                         <div class="families-list-container">
@@ -831,29 +804,45 @@
                     </div>
                 </section>
 
-                <!-- PANEL: CAMBIO DE CONTRASEÑA -->
+                <!-- PANEL: MI CUENTA -->
                 <section id="panel-mi-cuenta" class="panel">
                     <div class="panel-header">
                         <h1>Mi Cuenta</h1>
-                        <p class="panel-subtitle">Administre su clave de acceso al sistema.</p>
+                        <p class="panel-subtitle">Administre su información personal y clave de acceso al sistema.</p>
                     </div>
-                    <div class="card-visual"
-                        style="max-width: 450px; margin: 0 auto; background: var(--bg-secondary); padding: 20px; border-radius: var(--border-radius-lg);">
-                        <h4>Cambiar Contraseña</h4>
-                        <form id="form-cambio-clave" class="styled-form" style="margin-top: 16px;">
-                            <div class="form-group">
-                                <label for="pwd-nueva">Nueva Contraseña *</label>
-                                <input type="password" id="pwd-nueva" required placeholder="Mínimo 6 caracteres"
-                                    minlength="6">
-                            </div>
-                            <div class="form-group">
-                                <label for="pwd-confirmar">Confirmar Nueva Contraseña *</label>
-                                <input type="password" id="pwd-confirmar" required placeholder="Repita la contraseña"
-                                    minlength="6">
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-full" style="margin-top: 16px;">Actualizar
-                                Contraseña</button>
-                        </form>
+                    
+                    <div class="families-layout" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start;">
+                        <!-- Mis Datos -->
+                        <div class="card-visual" style="background: var(--bg-secondary); padding: 20px; border-radius: var(--border-radius-lg);">
+                            <h4>Mis Datos Personales</h4>
+                            <form id="form-mis-datos" class="styled-form" style="margin-top: 16px;">
+                                <div class="form-group">
+                                    <label for="mi-nombre">Nombre Completo *</label>
+                                    <input type="text" id="mi-nombre" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="mi-telefono">Teléfono</label>
+                                    <input type="text" id="mi-telefono" placeholder="Ej. 0412-1234567">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full" style="margin-top: 16px;">Actualizar Mis Datos</button>
+                            </form>
+                        </div>
+
+                        <!-- Cambiar Contraseña -->
+                        <div class="card-visual" style="background: var(--bg-secondary); padding: 20px; border-radius: var(--border-radius-lg);">
+                            <h4>Cambiar Contraseña</h4>
+                            <form id="form-cambio-clave" class="styled-form" style="margin-top: 16px;">
+                                <div class="form-group">
+                                    <label for="pwd-nueva">Nueva Contraseña *</label>
+                                    <input type="password" id="pwd-nueva" required placeholder="Mínimo 6 caracteres" minlength="6">
+                                </div>
+                                <div class="form-group">
+                                    <label for="pwd-confirmar">Confirmar Nueva Contraseña *</label>
+                                    <input type="password" id="pwd-confirmar" required placeholder="Repita la contraseña" minlength="6">
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full" style="margin-top: 16px;">Actualizar Contraseña</button>
+                            </form>
+                        </div>
                     </div>
                 </section>
 
@@ -1032,10 +1021,11 @@
     <div class="modal-overlay hidden" id="modal-comunidad">
         <div class="modal-box modal-small">
             <div class="modal-header">
-                <h3>Agregar Comunidad</h3>
+                <h3 id="modal-comunidad-title">Agregar Comunidad</h3>
                 <button class="btn-close-modal" id="btn-close-comunidad-modal">×</button>
             </div>
             <form id="form-comunidad" class="styled-form">
+                <input type="hidden" id="com-id">
                 <div class="form-group">
                     <label for="com-nombre">Nombre de la Comunidad *</label>
                     <input type="text" id="com-nombre" required placeholder="Ej. Yara Yara I">
@@ -1052,10 +1042,11 @@
     <div class="modal-overlay hidden" id="modal-edificio">
         <div class="modal-box modal-small">
             <div class="modal-header">
-                <h3>Agregar Edificio</h3>
+                <h3 id="modal-edificio-title">Agregar Edificio</h3>
                 <button class="btn-close-modal" id="btn-close-edificio-modal">×</button>
             </div>
             <form id="form-edificio" class="styled-form">
+                <input type="hidden" id="edf-id">
                 <div class="form-group">
                     <label for="edf-comunidad">Comunidad *</label>
                     <select id="edf-comunidad" required>
@@ -1078,10 +1069,11 @@
     <div class="modal-overlay hidden" id="modal-vivienda">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Registrar Nueva Vivienda</h3>
+                <h3 id="modal-vivienda-title">Registrar Nueva Vivienda</h3>
                 <button class="btn-close-modal" id="btn-close-vivienda-modal">×</button>
             </div>
             <form id="form-vivienda" class="styled-form">
+                <input type="hidden" id="viv-id">
                 <div class="form-grid-2">
                     <div class="form-group">
                         <label for="viv-comunidad">Comunidad *</label>
@@ -1111,6 +1103,34 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline" id="btn-cancel-vivienda-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Registrar Vivienda</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Editar Rol Usuario -->
+    <div class="modal-overlay hidden" id="modal-editar-rol">
+        <div class="modal-box modal-small">
+            <div class="modal-header">
+                <h3>Editar Rol de Usuario</h3>
+                <button class="btn-close-modal" id="btn-close-editar-rol">×</button>
+            </div>
+            <form id="form-editar-rol" class="styled-form">
+                <input type="hidden" id="edit-usr-id">
+                <div class="form-group">
+                    <p style="font-size: 14px; margin-bottom: 12px; color: var(--text-secondary);">
+                        Usuario: <strong id="edit-usr-nombre" style="color: var(--text-primary);"></strong>
+                    </p>
+                </div>
+                <div class="form-group">
+                    <label for="edit-usr-rol">Nuevo Rol *</label>
+                    <select id="edit-usr-rol" required>
+                        <!-- Cargado dinámicamente -->
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" id="btn-cancel-editar-rol">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
                 </div>
             </form>
         </div>

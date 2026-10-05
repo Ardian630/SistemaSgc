@@ -238,6 +238,17 @@ export async function apiAsociarNucleoVivienda(idNucleo, idVivienda) {
     return true;
 }
 
+export async function apiAsignarPersonaSueltaAVivienda(nombreFamilia, idVivienda, idPersona) {
+    if (!supabase) return null;
+    const { data, error } = await supabase.rpc('asignar_persona_suelta_a_vivienda', {
+        p_nombre_familia: nombreFamilia,
+        p_id_vivienda: idVivienda,
+        p_id_persona: idPersona
+    });
+    if (error) throw error;
+    return data;
+}
+
 export async function apiDeletePersona(id) {
     if (!supabase) return false;
     const { error } = await supabase.from('persona').delete().eq('id_persona', id);
@@ -316,6 +327,14 @@ export async function apiRegisterAdmin(adminData) {
 
     if (authData?.user) {
         try {
+            if (adminData.id_comunidad) {
+                // Update the profile explicitly
+                await supabase
+                    .from('usuario')
+                    .update({ id_comunidad: adminData.id_comunidad })
+                    .eq('id_usuario', authData.user.id);
+            }
+
             const { data: profileList } = await supabase
                 .from('usuario')
                 .select('*')
@@ -401,4 +420,72 @@ export async function apiUpdatePassword(newPassword) {
     const { data, error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
     return data;
+}
+
+export async function apiUpdateMisDatos(id_usuario, nombre, telefono) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { data, error } = await supabase
+        .from('usuario')
+        .update({ nombre_completo: nombre, telefono: telefono })
+        .eq('id_usuario', id_usuario);
+    if (error) throw error;
+    return data;
+}
+
+export async function apiUpdateUserRole(id_usuario, new_role_id) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { data, error } = await supabase
+        .from('usuario')
+        .update({ id_rol: new_role_id })
+        .eq('id_usuario', id_usuario);
+    if (error) throw error;
+    return data;
+}
+
+export async function apiUpdateComunidad(id, nombre) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { data, error } = await supabase.from('comunidad').update({ nombre_comunidad: nombre }).eq('id_comunidad', id).select();
+    if (error) throw error;
+    return data ? data[0] : null;
+}
+
+export async function apiDeleteComunidad(id) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { error } = await supabase.from('comunidad').delete().eq('id_comunidad', id);
+    if (error) throw error;
+    return true;
+}
+
+export async function apiUpdateEdificio(id, id_comunidad, nombre) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { data, error } = await supabase.from('edificio').update({ id_comunidad: id_comunidad, nombre_edificio: nombre }).eq('id_edificio', id).select();
+    if (error) throw error;
+    return data ? data[0] : null;
+}
+
+export async function apiDeleteEdificio(id) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { error } = await supabase.from('edificio').delete().eq('id_edificio', id);
+    if (error) throw error;
+    return true;
+}
+
+export async function apiUpdateVivienda(id, id_comunidad, id_edificio, numero, bloque) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const payload = {
+        id_comunidad: id_comunidad,
+        id_edificio: id_edificio || null,
+        numero_vivienda: numero,
+        numero_bloque: bloque || null
+    };
+    const { data, error } = await supabase.from('vivienda').update(payload).eq('id_vivienda', id).select();
+    if (error) throw error;
+    return data ? data[0] : null;
+}
+
+export async function apiDeleteVivienda(id) {
+    if (!supabase) throw new Error("Cliente no conectado.");
+    const { error } = await supabase.from('vivienda').delete().eq('id_vivienda', id);
+    if (error) throw error;
+    return true;
 }

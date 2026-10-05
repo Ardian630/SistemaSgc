@@ -138,6 +138,7 @@ export async function handleRegisterAdminSubmit(event) {
     const email = document.getElementById("reg-email").value.trim();
     const telefono = document.getElementById("reg-telefono").value || null;
     const password = document.getElementById("reg-password").value;
+    const id_comunidad = document.getElementById("reg-comunidad") ? (document.getElementById("reg-comunidad").value || null) : null;
 
     const nameRegex = /^[A-Za-záéíóúÁÉÍÓÚñÑ\s]+$/;
     if (!nameRegex.test(nombre)) {
@@ -158,7 +159,8 @@ export async function handleRegisterAdminSubmit(event) {
             nombre_completo: nombre,
             email: email,
             telefono: telefono,
-            password: password
+            password: password,
+            id_comunidad: id_comunidad
         });
 
         showAlert("Administrador inicial registrado exitosamente. Inicie sesión.", "success");
@@ -204,6 +206,10 @@ export async function handleLoginSubmit(event, onSuccessCallback) {
             if (typeof onSuccessCallback === "function") {
                 await onSuccessCallback();
             }
+            
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
         } else {
             showAlert("Credenciales incorrectas o usuario no encontrado.", "error");
         }
