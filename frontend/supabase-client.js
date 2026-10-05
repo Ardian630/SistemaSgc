@@ -1,8 +1,8 @@
 // =========================================================================
 // CLIENTE Y CONFIGURACIÓN DE CONEXIÓN A SUPABASE
 // =========================================================================
-const SUPABASE_URL = "https://vamnpviwpbzpxhyvrout.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhbW5wdml3cGJ6cHhoeXZyb3V0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwOTI0MTQsImV4cCI6MjA3NzY2ODQxNH0.OZuW83jugil--NKDNMCEvLmdJ2jILcgp1SdP0R4HDv4";
+const SUPABASE_URL = "https://qdmyjbjmlzvigplyxqnn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_e-K7CCrj_tckO3LzEH_N8g_wZ2AsZiE";
 
 let supabase = null;
 
@@ -360,7 +360,8 @@ export async function apiLogin(email, password) {
                 .from('usuario')
                 .select('*')
                 .eq('id_usuario', data.user.id)
-                .single();
+            //.maybeSingle();
+            console.log("Datos:", profile, "Error:", error);
 
             if (profile) return profile;
         } catch (pErr) {

@@ -92,7 +92,11 @@ CREATE OR REPLACE FUNCTION public.registrar_nucleo_y_jefe(
     p_id_profesion UUID,
     p_id_discapacidad UUID
 )
-RETURNS JSON AS $$
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 DECLARE
     v_id_nucleo UUID;
     v_id_persona UUID;
@@ -135,4 +139,6 @@ EXCEPTION
         -- Si ocurre cualquier error, PostgreSQL revierte todo automáticamente (ROLLBACK)
         RAISE EXCEPTION 'Error al registrar núcleo y jefe de familia: % (Código: %)', SQLERRM, SQLSTATE;
 END;
-$$ LANGUAGE plpgsql;
+$$;
+
+ALTER FUNCTION public.registrar_nucleo_y_jefe(VARCHAR, UUID, VARCHAR, VARCHAR, VARCHAR, DATE, VARCHAR, VARCHAR, VARCHAR, UUID, UUID) OWNER TO postgres;

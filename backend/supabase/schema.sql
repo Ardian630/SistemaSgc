@@ -117,143 +117,211 @@ ALTER TABLE public.persona ENABLE ROW LEVEL SECURITY;
 
 -- Funciones auxiliares de seguridad (Security Definer para evadir RLS recursivo)
 CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS VARCHAR AS $$
+RETURNS VARCHAR
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
     SELECT r.nombre_rol 
     FROM public.usuario u 
     JOIN public.roles r ON u.id_rol = r.id_rol 
     WHERE u.id_usuario = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
+$$;
+
+ALTER FUNCTION public.get_user_role() OWNER TO postgres;
 
 CREATE OR REPLACE FUNCTION public.get_user_community()
-RETURNS UUID AS $$
+RETURNS UUID
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
     SELECT id_comunidad 
     FROM public.usuario 
     WHERE id_usuario = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
+$$;
+
+ALTER FUNCTION public.get_user_community() OWNER TO postgres;
 
 -- 1. Políticas para 'roles'
--- Lectura pública (incluyendo anon para flujo de registro inicial)
-CREATE POLICY "Permitir lectura de roles a todos" 
-ON public.roles FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Permitir lectura de roles anon" 
-ON public.roles FOR SELECT TO anon USING (true);
-
-CREATE POLICY "Solo Administrador puede modificar roles" 
-ON public.roles FOR ALL TO authenticated USING (public.get_user_role() IN ('Administrador', 'administrador_debil'));
+CREATE POLICY "Lectura de roles (anon y auth)" ON public.roles FOR SELECT USING (true);
+CREATE POLICY "Admins modifican roles" ON public.roles FOR ALL TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+);
 
 -- 2. Políticas para 'comunidad'
-CREATE POLICY "Permitir lectura de comunidades a todos" 
-ON public.comunidad FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Solo Administrador puede modificar comunidades" 
-ON public.comunidad FOR ALL TO authenticated USING (public.get_user_role() IN ('Administrador', 'administrador_debil'));
+CREATE POLICY "Lectura de comunidades" ON public.comunidad FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins modifican comunidades" ON public.comunidad FOR ALL TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+);
 
 -- 3. Políticas para 'usuario'
--- Lectura anon limitada: solo contar si existen usuarios (para decidir registro vs login)
-CREATE POLICY "Anon puede verificar existencia de usuarios"
-ON public.usuario FOR SELECT TO anon USING (true);
+CREATE POLICY "Anon puede verificar existencia de usuarios" ON public.usuario FOR SELECT TO anon USING (true);
 
-CREATE POLICY "Lectura de perfiles de usuario" 
-ON public.usuario FOR SELECT TO authenticated USING (
+CREATE POLICY "Lectura de usuarios" ON public.usuario FOR SELECT TO authenticated USING (
     id_usuario = auth.uid() 
     OR public.get_user_role() IN ('Administrador', 'administrador_debil') 
     OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
 );
 
-CREATE POLICY "Modificación de perfiles de usuario" 
-ON public.usuario FOR UPDATE TO authenticated USING (
+CREATE POLICY "Inserción de usuarios" ON public.usuario FOR INSERT TO authenticated WITH CHECK (
+    public.get_user_role() IN ('Administrador', 'administrador_debil') 
+    OR id_usuario = auth.uid()
+);
+
+CREATE POLICY "Modificación de usuarios" ON public.usuario FOR UPDATE TO authenticated USING (
     id_usuario = auth.uid() 
     OR public.get_user_role() IN ('Administrador', 'administrador_debil')
 );
 
-CREATE POLICY "Inserción de usuarios" 
-ON public.usuario FOR INSERT TO authenticated WITH CHECK (
-    public.get_user_role() IN ('Administrador', 'administrador_debil') OR id_usuario = auth.uid()
-);
-
-CREATE POLICY "Eliminación de usuarios por administrador" 
-ON public.usuario FOR DELETE TO authenticated USING (
+CREATE POLICY "Eliminar usuarios" ON public.usuario FOR DELETE TO authenticated USING (
     public.get_user_role() = 'Administrador'
     OR (
         public.get_user_role() = 'administrador_debil'
-        AND usuario.id_rol NOT IN (
+        AND id_rol NOT IN (
             SELECT id_rol FROM public.roles WHERE nombre_rol IN ('Administrador', 'administrador_debil')
         )
     )
 );
 
 -- 4. Políticas para 'edificio'
-CREATE POLICY "Permitir lectura de edificios a todos" 
-ON public.edificio FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Escritura de edificios para Administradores y Líderes" 
-ON public.edificio FOR ALL TO authenticated USING (
+CREATE POLICY "Lectura de edificios" ON public.edificio FOR SELECT TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (public.get_user_role() IN ('Líder de comunidad', 'Consultor') AND id_comunidad = public.get_user_community())
+);
+CREATE POLICY "Insertar edificios" ON public.edificio FOR INSERT TO authenticated WITH CHECK (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
+);
+CREATE POLICY "Actualizar edificios" ON public.edificio FOR UPDATE TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
+);
+CREATE POLICY "Eliminar edificios" ON public.edificio FOR DELETE TO authenticated USING (
     public.get_user_role() IN ('Administrador', 'administrador_debil')
     OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
 );
 
 -- 5. Políticas para 'vivienda'
-CREATE POLICY "Permitir lectura de viviendas a todos" 
-ON public.vivienda FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Escritura de viviendas para Administradores y Líderes" 
-ON public.vivienda FOR ALL TO authenticated USING (
+CREATE POLICY "Lectura de viviendas" ON public.vivienda FOR SELECT TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (public.get_user_role() IN ('Líder de comunidad', 'Consultor') AND id_comunidad = public.get_user_community())
+);
+CREATE POLICY "Insertar viviendas" ON public.vivienda FOR INSERT TO authenticated WITH CHECK (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
+);
+CREATE POLICY "Actualizar viviendas" ON public.vivienda FOR UPDATE TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
+);
+CREATE POLICY "Eliminar viviendas" ON public.vivienda FOR DELETE TO authenticated USING (
     public.get_user_role() IN ('Administrador', 'administrador_debil')
     OR (public.get_user_role() = 'Líder de comunidad' AND id_comunidad = public.get_user_community())
 );
 
 -- 6. Políticas para 'nucleo'
-CREATE POLICY "Permitir lectura de nucleos a todos" 
-ON public.nucleo FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Escritura de nucleos para Administradores y Líderes" 
-ON public.nucleo FOR ALL TO authenticated USING (
+CREATE POLICY "Lectura de nucleos" ON public.nucleo FOR SELECT TO authenticated USING (
     public.get_user_role() IN ('Administrador', 'administrador_debil')
     OR (
-        public.get_user_role() = 'Líder de comunidad' 
-        AND EXISTS (
-            SELECT 1 FROM public.vivienda v 
-            WHERE v.id_vivienda = nucleo.id_vivienda 
-            AND v.id_comunidad = public.get_user_community()
+        public.get_user_role() IN ('Líder de comunidad', 'Consultor') AND id_vivienda IN (
+            SELECT id_vivienda FROM public.vivienda WHERE id_comunidad = public.get_user_community()
+        )
+    )
+);
+CREATE POLICY "Insertar nucleos" ON public.nucleo FOR INSERT TO authenticated WITH CHECK (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (
+        public.get_user_role() = 'Líder de comunidad' AND id_vivienda IN (
+            SELECT id_vivienda FROM public.vivienda WHERE id_comunidad = public.get_user_community()
+        )
+    )
+);
+CREATE POLICY "Actualizar nucleos" ON public.nucleo FOR UPDATE TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (
+        public.get_user_role() = 'Líder de comunidad' AND id_vivienda IN (
+            SELECT id_vivienda FROM public.vivienda WHERE id_comunidad = public.get_user_community()
+        )
+    )
+);
+CREATE POLICY "Eliminar nucleos" ON public.nucleo FOR DELETE TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (
+        public.get_user_role() = 'Líder de comunidad' AND id_vivienda IN (
+            SELECT id_vivienda FROM public.vivienda WHERE id_comunidad = public.get_user_community()
         )
     )
 );
 
 -- 7. Políticas para 'profesion'
-CREATE POLICY "Permitir lectura de profesiones a todos" 
-ON public.profesion FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Escritura de profesiones para Administradores y Líderes" 
-ON public.profesion FOR ALL TO authenticated USING (
+CREATE POLICY "Lectura de profesiones" ON public.profesion FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Escritura de profesiones" ON public.profesion FOR ALL TO authenticated USING (
     public.get_user_role() IN ('Administrador', 'administrador_debil', 'Líder de comunidad')
 );
 
 -- 8. Políticas para 'discapacidad'
-CREATE POLICY "Permitir lectura de discapacidades a todos" 
-ON public.discapacidad FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Escritura de discapacidades para Administradores y Líderes" 
-ON public.discapacidad FOR ALL TO authenticated USING (
+CREATE POLICY "Lectura de discapacidades" ON public.discapacidad FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Escritura de discapacidades" ON public.discapacidad FOR ALL TO authenticated USING (
     public.get_user_role() IN ('Administrador', 'administrador_debil', 'Líder de comunidad')
 );
 
 -- 9. Políticas para 'persona'
-CREATE POLICY "Permitir lectura de personas a todos" 
-ON public.persona FOR SELECT TO authenticated USING (true);
-
-CREATE POLICY "Escritura de personas para Administradores y Líderes" 
-ON public.persona FOR ALL TO authenticated USING (
+CREATE POLICY "Lectura de personas" ON public.persona FOR SELECT TO authenticated USING (
     public.get_user_role() IN ('Administrador', 'administrador_debil')
     OR (
-        public.get_user_role() = 'Líder de comunidad'
+        public.get_user_role() IN ('Líder de comunidad', 'Consultor') 
         AND (
-            persona.id_nucleo IS NULL 
-            OR EXISTS (
-                SELECT 1 FROM public.nucleo n
-                JOIN public.vivienda v ON n.id_vivienda = v.id_vivienda
-                WHERE n.id_nucleo = persona.id_nucleo
-                AND v.id_comunidad = public.get_user_community()
+            id_nucleo IS NULL 
+            OR id_nucleo IN (
+                SELECT n.id_nucleo FROM public.nucleo n 
+                JOIN public.vivienda v ON n.id_vivienda = v.id_vivienda 
+                WHERE v.id_comunidad = public.get_user_community()
+            )
+        )
+    )
+);
+
+CREATE POLICY "Insertar personas" ON public.persona FOR INSERT TO authenticated WITH CHECK (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (
+        public.get_user_role() = 'Líder de comunidad' 
+        AND (
+            id_nucleo IS NULL 
+            OR id_nucleo IN (
+                SELECT n.id_nucleo FROM public.nucleo n 
+                JOIN public.vivienda v ON n.id_vivienda = v.id_vivienda 
+                WHERE v.id_comunidad = public.get_user_community()
+            )
+        )
+    )
+);
+
+CREATE POLICY "Actualizar personas" ON public.persona FOR UPDATE TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (
+        public.get_user_role() = 'Líder de comunidad' 
+        AND (
+            id_nucleo IS NULL 
+            OR id_nucleo IN (
+                SELECT n.id_nucleo FROM public.nucleo n 
+                JOIN public.vivienda v ON n.id_vivienda = v.id_vivienda 
+                WHERE v.id_comunidad = public.get_user_community()
+            )
+        )
+    )
+);
+
+CREATE POLICY "Eliminar personas" ON public.persona FOR DELETE TO authenticated USING (
+    public.get_user_role() IN ('Administrador', 'administrador_debil')
+    OR (
+        public.get_user_role() = 'Líder de comunidad' 
+        AND (
+            id_nucleo IS NULL 
+            OR id_nucleo IN (
+                SELECT n.id_nucleo FROM public.nucleo n 
+                JOIN public.vivienda v ON n.id_vivienda = v.id_vivienda 
+                WHERE v.id_comunidad = public.get_user_community()
             )
         )
     )

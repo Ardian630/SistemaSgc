@@ -139,6 +139,20 @@ export async function handleRegisterAdminSubmit(event) {
     const telefono = document.getElementById("reg-telefono").value || null;
     const password = document.getElementById("reg-password").value;
 
+    const nameRegex = /^[A-Za-záéíóúÁÉÍÓÚñÑ\s]+$/;
+    if (!nameRegex.test(nombre)) {
+        showAlert("Los nombres no pueden contener números.", "error");
+        return;
+    }
+
+    if (telefono) {
+        const phoneRegex = /^04(12|14|16|24|26)-\d{7}$/;
+        if (!phoneRegex.test(telefono)) {
+            showAlert("El teléfono debe tener el formato 04xx-xxxxxxx", "error");
+            return;
+        }
+    }
+
     try {
         await apiRegisterAdmin({
             nombre_completo: nombre,

@@ -134,6 +134,17 @@ function restoreActivePanel() {
 async function initApp() {
     initTheme();
 
+    // Diagnóstico RLS: muestra cómo ve la base de datos la sesión actual
+    if (supabase) {
+        try {
+            const { data: diag, error: diagErr } = await supabase.rpc('debug_mi_sesion');
+            if (diagErr) console.warn("[RLS Debug] No se pudo ejecutar debug_mi_sesion:", diagErr);
+            else console.log("[RLS Debug] Sesión vista por la BD:", diag);
+        } catch (e) {
+            console.warn("[RLS Debug] Error:", e);
+        }
+    }
+
     try { await populateSelects(); } catch (err) { console.warn("[App] Error cargando selectores:", err); }
     try { await populateProfessionsChecklist(); } catch (err) { console.warn("[App] Error cargando profesiones:", err); }
     try { await renderDashboard(); } catch (err) { console.warn("[App] Error renderizando dashboard:", err); }
@@ -532,6 +543,26 @@ async function handlePersonaSubmit(e) {
         id_discapacidad: document.getElementById("persona-discapacidad").value || null
     };
 
+    const nameRegex = /^[A-Za-záéíóúÁÉÍÓÚñÑ\s]+$/;
+    if (!nameRegex.test(personaData.nombre_completo)) {
+        showAlert("Los nombres no pueden contener números.", "error");
+        return;
+    }
+
+    const cedulaRegex = /^\d{6,9}$/;
+    if (!cedulaRegex.test(personaData.cedula_identidad)) {
+        showAlert("La cédula debe contener solo números (entre 6 y 9 dígitos).", "error");
+        return;
+    }
+
+    if (personaData.telefono) {
+        const phoneRegex = /^04(12|14|16|24|26)-\d{7}$/;
+        if (!phoneRegex.test(personaData.telefono)) {
+            showAlert("El teléfono debe tener el formato 04xx-xxxxxxx", "error");
+            return;
+        }
+    }
+
     try {
         if (personaId) {
             await uiUpdatePersona(personaId, personaData);
@@ -560,6 +591,12 @@ async function handleFamiliaSubmit(e) {
     const jefeId = jefeSelect ? jefeSelect.value : null;
     const viviendaId = document.getElementById("fam-vivienda").value || null;
     const nombreFam = document.getElementById("fam-nombre").value;
+
+    const nameRegex = /^[A-Za-záéíóúÁÉÍÓÚñÑ\s]+$/;
+    if (!nameRegex.test(nombreFam)) {
+        showAlert("El nombre de la familia no puede contener números.", "error");
+        return;
+    }
 
     try {
         await uiCreateNucleo(nombreFam, viviendaId, jefeId);
@@ -701,6 +738,20 @@ async function handleCrearUsuario(e) {
     const rol = document.getElementById("usr-rol").value;
     const commId = document.getElementById("usr-comunidad").value || null;
     const pass = document.getElementById("usr-password").value;
+
+    const nameRegex = /^[A-Za-záéíóúÁÉÍÓÚñÑ\s]+$/;
+    if (!nameRegex.test(nombre)) {
+        showAlert("Los nombres no pueden contener números.", "error");
+        return;
+    }
+
+    if (tlf) {
+        const phoneRegex = /^04(12|14|16|24|26)-\d{7}$/;
+        if (!phoneRegex.test(tlf)) {
+            showAlert("El teléfono debe tener el formato 04xx-xxxxxxx", "error");
+            return;
+        }
+    }
 
     if (!rol) {
         showAlert("Debe seleccionar un rol para el nuevo usuario.", "warning");

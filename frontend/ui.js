@@ -806,10 +806,29 @@ export async function uiCreateComunidad(nombre) {
 }
 
 export async function uiCreateEdificio(nombre, idComunidad) {
+    const edificios = await apiGetEdificios();
+    const nameLower = nombre.trim().toLowerCase();
+    const existe = edificios.some(ed => ed.id_comunidad === idComunidad && ed.nombre_edificio.toLowerCase() === nameLower);
+    
+    if (existe) {
+        throw new Error("Ya existe un edificio/casa con este nombre en esta comunidad.");
+    }
     await apiCreateEdificio(nombre, idComunidad);
 }
 
 export async function uiCreateVivienda(idComunidad, idEdificio, numero, bloque) {
+    const viviendas = await apiGetViviendas();
+    const numLower = numero.trim().toLowerCase();
+    
+    const existe = viviendas.some(v => 
+        v.id_comunidad === idComunidad && 
+        v.id_edificio === (idEdificio || null) && 
+        v.numero_vivienda.toLowerCase() === numLower
+    );
+
+    if (existe) {
+        throw new Error("Ya existe una vivienda con este número en el edificio o comunidad seleccionada.");
+    }
     await apiCreateVivienda(idComunidad, idEdificio, numero, bloque);
 }
 
