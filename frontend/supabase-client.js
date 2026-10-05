@@ -1,8 +1,7 @@
 // =========================================================================
 // CLIENTE Y CONFIGURACIÓN DE CONEXIÓN A SUPABASE
 // =========================================================================
-const SUPABASE_URL = "https://qdmyjbjmlzvigplyxqnn.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_e-K7CCrj_tckO3LzEH_N8g_wZ2AsZiE";
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env.js';
 
 let supabase = null;
 
