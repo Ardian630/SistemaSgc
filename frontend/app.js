@@ -46,6 +46,7 @@ import {
     uiSaveDiscapacidad,
     renderCharts,
     exportarPersonasExcel,
+    exportarReportesPDF,
     uiUpdateMisDatos,
     uiUpdateUserRole
 } from "./ui.js";
@@ -519,6 +520,11 @@ function setupEventListeners() {
     const btnExportarExcel = document.getElementById("btn-exportar-excel");
     if (btnExportarExcel) {
         btnExportarExcel.addEventListener("click", exportarPersonasExcel);
+    }
+
+    const btnExportarPdf = document.getElementById("btn-exportar-pdf-reportes");
+    if (btnExportarPdf) {
+        btnExportarPdf.addEventListener("click", exportarReportesPDF);
     }
 }
 

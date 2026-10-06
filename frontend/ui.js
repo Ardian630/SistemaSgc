@@ -1443,6 +1443,83 @@ export async function renderCharts() {
     });
 }
 
+// Exportar Reportes Gráficos a PDF
+export async function exportarReportesPDF() {
+    if (typeof window.jspdf === "undefined" || typeof window.html2canvas === "undefined") {
+        showAlert("Las librerías jsPDF o html2canvas no se han cargado.", "error");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+    const panel = document.getElementById("panel-reportes");
+    
+    // Ocultar botones de acciones temporalmente
+    const headerActions = panel.querySelector(".panel-header-actions");
+    const originalDisplay = headerActions ? headerActions.style.display : "";
+    if (headerActions) headerActions.style.display = "none";
+
+    try {
+        // Capturar el panel completo con html2canvas
+        const canvas = await window.html2canvas(panel, {
+            scale: 2, // Mayor calidad
+            backgroundColor: "#1e1e2d", // Fondo oscuro para que coincida con el tema
+            useCORS: true
+        });
+
+        // Restaurar botones
+        if (headerActions) headerActions.style.display = originalDisplay;
+
+        const imgData = canvas.toDataURL("image/jpeg", 0.95); // Usar JPEG es más seguro y menos propenso a corromper PDFs
+        
+        // Crear documento PDF
+        const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 10;
+        const contentWidth = pageWidth - margin * 2;
+        
+        // Calcular alto proporcional
+        const imgHeight = (canvas.height * contentWidth) / canvas.width;
+
+        // Añadir encabezado
+        doc.setFillColor(30, 30, 50);
+        doc.rect(0, 0, pageWidth, 25, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(255, 255, 255);
+        doc.text("SGC - Reportes y Análisis Gráfico", margin, 12);
+        
+        const now = new Date();
+        const dateStr = now.toLocaleDateString("es-VE");
+        doc.setFontSize(10);
+        doc.setTextColor(200, 200, 220);
+        doc.text(`Generado: ${dateStr}`, margin, 19);
+
+        let heightLeft = imgHeight;
+        let position = 30; // Empezar debajo del encabezado
+
+        // Añadir primera página de la imagen
+        doc.addImage(imgData, 'JPEG', margin, position, contentWidth, imgHeight);
+        heightLeft -= (pageHeight - position);
+
+        // Si la imagen es más larga que una página, añadir páginas adicionales
+        while (heightLeft > 0) {
+            position = heightLeft - imgHeight; 
+            doc.addPage();
+            doc.addImage(imgData, 'JPEG', margin, position, contentWidth, imgHeight);
+            heightLeft -= pageHeight;
+        }
+
+        const fileName = `Reportes_SGC_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}.pdf`;
+        doc.save(fileName);
+        showAlert("Reporte PDF generado exitosamente.", "success");
+    } catch (error) {
+        if (headerActions) headerActions.style.display = originalDisplay;
+        console.error("Error generating PDF:", error);
+        showAlert("Hubo un error al generar el PDF.", "error");
+    }
+}
+
 // Exportado desde ui.js para que app.js lo pueda usar si es necesario
 export function getFilteredPersonas(db) {
     const filterText = document.getElementById("filter-cedula")?.value.toLowerCase().trim() || "";
