@@ -44,6 +44,7 @@ import {
     uiUpdateFamily,
     renderParametros,
     uiSaveDiscapacidad,
+    uiSaveProfesion,
     renderCharts,
     exportarPersonasExcel,
     exportarReportesPDF,
