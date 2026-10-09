@@ -1,6 +1,6 @@
 # Manual Técnico - Sistema de Gestión Comunal (SGC)
 
-Este documento describe de forma exhaustiva la arquitectura, la estructura interna, el modelo de datos, los mecanismos de seguridad, las funcionalidades del sistema y las configuraciones necesarias para su correcto funcionamiento. Está dirigido exclusivamente a personal técnico responsable del mantenimiento, auditoría o continuidad del proyecto.
+Este documento describe la información del proyecto y credenciales del propietario, la descripción general del sistema, su arquitectura y stack tecnológico, la estructura de archivos, el sistema de seguridad y control de acceso, las automatizaciones de base de datos (triggers y RPC), y la navegación y comportamiento de la interfaz. Está dirigido exclusivamente a personal técnico responsable del mantenimiento, auditoría o continuidad del proyecto.
 
 ## Índice
 
