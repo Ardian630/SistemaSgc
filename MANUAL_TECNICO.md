@@ -64,9 +64,9 @@ El **Sistema de Gestión Comunal (SGC)** es una aplicación web diseñada para r
 
 El SGC opera bajo una arquitectura **Serverless de tipo Single Page Application (SPA)**. Esto significa que:
 
-- **No existe un servidor backend propio.** No hay un proceso de Node.js, Python, PHP ni ningún otro lenguaje corriendo en un servidor intermedio. La aplicación se compone exclusivamente de archivos estáticos (HTML, CSS, JavaScript) que el navegador del usuario descarga y ejecuta.
-- **La base de datos, la autenticación y las reglas de negocio del lado del servidor** están delegadas en su totalidad al servicio de **Supabase**, un Backend-as-a-Service (BaaS) construido sobre PostgreSQL.
-- **La comunicación entre el navegador y Supabase** se realiza mediante llamadas HTTPS directas a la API REST auto-generada de Supabase (PostgREST) y a su SDK de JavaScript. La seguridad de estas llamadas está garantizada por tokens JWT firmados (JSON Web Tokens) y por políticas de Row Level Security (RLS) definidas directamente en la base de datos.
+- **No existe un servidor backend propio:** No hay un proceso de Node.js, Python, PHP ni ningún otro lenguaje corriendo en un servidor intermedio. La aplicación se compone exclusivamente de archivos estáticos (HTML, CSS, JavaScript) que el navegador del usuario descarga y ejecuta.
+- **La base de datos, la autenticación y las reglas de negocio del lado del servidor:** están delegadas en su totalidad al servicio de **Supabase**, un Backend-as-a-Service (BaaS) construido sobre PostgreSQL.
+- **La comunicación entre el navegador y Supabase:** se realiza mediante llamadas HTTPS directas a la API REST auto-generada de Supabase (PostgREST ) y a su SDK de JavaScript. La seguridad de estas llamadas está garantizada por tokens JWT firmados (JSON Web Tokens) y por políticas de Row Level Security (RLS) definidas directamente en la base de datos.
 
 El flujo de datos se resume así:
 
