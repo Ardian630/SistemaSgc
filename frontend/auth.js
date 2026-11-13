@@ -10,6 +10,54 @@ import {
 
 let currentUser = null;
 
+export function isUserAdmin(user = null) {
+    const u = user || currentUser;
+    if (!u) return false;
+    const adminUuids = [
+        "eec65b46-ce49-41be-9da7-be001e7ce87e", // Administrador
+        "8c37a94d-7b05-42fc-9fdb-5e4eb8cee87f", // administrador_debil
+        "1",
+        "r-1",
+        "r-4"
+    ];
+    if (adminUuids.includes(String(u.id_rol))) return true;
+    const roleName = (u.nombre_rol || "").toLowerCase();
+    return roleName.includes("administrador") || roleName.includes("admin");
+}
+
+export function isUserWeakAdmin(user = null) {
+    const u = user || currentUser;
+    if (!u) return false;
+    if (String(u.id_rol) === "8c37a94d-7b05-42fc-9fdb-5e4eb8cee87f" || String(u.id_rol) === "r-4") return true;
+    const roleName = (u.nombre_rol || "").toLowerCase();
+    return roleName.includes("débil") || roleName.includes("debil");
+}
+
+export function isUserConsultor(user = null) {
+    const u = user || currentUser;
+    if (!u) return false;
+    if (String(u.id_rol) === "73ef3e01-65ac-4891-8df9-91db1f6d364b" || String(u.id_rol) === "3" || String(u.id_rol) === "r-3") return true;
+    const roleName = (u.nombre_rol || "").toLowerCase();
+    return roleName.includes("consultor");
+}
+
+export function isUserLider(user = null) {
+    const u = user || currentUser;
+    if (!u) return false;
+    if (String(u.id_rol) === "6a97aa3d-0b9f-4ea8-9ae8-a9215abf68c3" || String(u.id_rol) === "2" || String(u.id_rol) === "r-2") return true;
+    const roleName = (u.nombre_rol || "").toLowerCase();
+    return roleName.includes("lider") || roleName.includes("líder");
+}
+
+export function isPanelAllowedForUser(panelId, user = null) {
+    const u = user || currentUser;
+    if (!u) return false;
+    if (panelId === "panel-usuarios" || panelId === "panel-parametros") {
+        return isUserAdmin(u);
+    }
+    return true;
+}
+
 // Retorna la sesión activa del usuario
 export function getCurrentUser() {
     return currentUser;
@@ -106,19 +154,23 @@ async function updateProfileUI() {
             const roleObj = roles.find(r => r.id_rol === currentUser.id_rol);
             if (roleObj) {
                 roleName = roleObj.nombre_rol;
+                currentUser.nombre_rol = roleObj.nombre_rol;
             }
         }
     } catch (err) {
         console.error("Error al obtener roles:", err);
     }
 
+    if (!currentUser.nombre_rol) {
+        currentUser.nombre_rol = roleName;
+    }
+
     if (roleEl) roleEl.textContent = roleName;
 
-    // Filtrar la pestaña de "Gestión de Cuentas" (solo visible para administradores)
+    // Filtrar las pestañas de "Gestión de Cuentas" y "Parámetros" (solo visible para administradores)
     const menuUsr = document.getElementById("menu-item-usuarios");
     const menuParam = document.getElementById("menu-item-parametros");
-    const lowerRole = roleName.toLowerCase();
-    const isAdmin = lowerRole.includes("administrador") || lowerRole.includes("admin");
+    const isAdmin = isUserAdmin(currentUser);
 
     if (menuUsr) {
         if (isAdmin) menuUsr.classList.remove("hidden");
@@ -127,6 +179,22 @@ async function updateProfileUI() {
     if (menuParam) {
         if (isAdmin) menuParam.classList.remove("hidden");
         else menuParam.classList.add("hidden");
+    }
+
+    // Si el usuario no es admin y está intentando acceder a usuarios o parámetros, redirigir a dashboard
+    if (!isAdmin) {
+        const storedPanel = localStorage.getItem("activePanelId") || sessionStorage.getItem("activePanelId") || "";
+        const hash = (window.location.hash || "").replace("#", "").toLowerCase();
+        if (storedPanel === "panel-usuarios" || storedPanel === "panel-parametros" || hash === "usuarios" || hash === "parametros") {
+            localStorage.setItem("activePanelId", "panel-dashboard");
+            sessionStorage.setItem("activePanelId", "panel-dashboard");
+            if (window.location.hash) {
+                history.replaceState(null, "", "#dashboard");
+            }
+            if (typeof window.navigateToPanel === "function") {
+                window.navigateToPanel("panel-dashboard", { saveStorage: true, updateHash: true, render: true });
+            }
+        }
     }
 }
 
@@ -191,6 +259,13 @@ export async function handleLoginSubmit(event, onSuccessCallback) {
             showAlert("Sesión iniciada correctamente.", "success");
             event.target.reset();
 
+            // Garantizar que al iniciar sesión siempre se acceda primero al Dashboard de bienvenida
+            localStorage.setItem("activePanelId", "panel-dashboard");
+            sessionStorage.setItem("activePanelId", "panel-dashboard");
+            if (window.location.hash) {
+                history.replaceState(null, "", window.location.pathname + window.location.search);
+            }
+
             // Ocultar overlays y mostrar aplicación de manera fluida
             const regOverlay = document.getElementById("auth-register-overlay");
             const loginOverlay = document.getElementById("auth-login-overlay");
@@ -209,7 +284,7 @@ export async function handleLoginSubmit(event, onSuccessCallback) {
             
             setTimeout(() => {
                 window.location.reload();
-            }, 1000);
+            }, 800);
         } else {
             showAlert("Credenciales incorrectas o usuario no encontrado.", "error");
         }
@@ -230,7 +305,23 @@ export async function handleLogoutClick() {
         console.error("Error al cerrar sesión:", err);
     }
     currentUser = null;
-    sessionStorage.removeItem("activePanelId");
+
+    // Al cerrar sesión, restablecer el panel por defecto a Dashboard y limpiar hash
+    localStorage.setItem("activePanelId", "panel-dashboard");
+    sessionStorage.setItem("activePanelId", "panel-dashboard");
+    if (window.location.hash) {
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+
+    // Restablecer el estado activo del DOM a Dashboard
+    document.querySelectorAll(".menu-item").forEach(mi => {
+        if (mi.getAttribute("data-target") === "panel-dashboard") mi.classList.add("active");
+        else mi.classList.remove("active");
+    });
+    document.querySelectorAll(".panel").forEach(p => {
+        if (p.id === "panel-dashboard") p.classList.add("active");
+        else p.classList.remove("active");
+    });
 
     // Transición suave de salida a Login
     const appContainer = document.querySelector(".app-container");

@@ -7,6 +7,8 @@ import { showAlert, showConfirm } from './notifications.js';
 import {
     initializeAuth,
     getCurrentUser,
+    isUserAdmin,
+    isPanelAllowedForUser,
     handleRegisterAdminSubmit,
     handleLoginSubmit,
     handleLogoutClick
@@ -48,6 +50,7 @@ import {
     renderCharts,
     exportarPersonasExcel,
     exportarReportesPDF,
+    setReportesSexFilter,
     uiUpdateMisDatos,
     uiUpdateUserRole
 } from "./ui.js";
@@ -71,6 +74,11 @@ import {
 // =========================================================================
 
 document.addEventListener("DOMContentLoaded", async () => {
+    // Unificación tipográfica global para Chart.js
+    if (typeof window !== "undefined" && window.Chart) {
+        Chart.defaults.font.family = "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    }
+
     // Inicializar controles globales (toggles de clave, sidebar, menú móvil, alternancia auth)
     setupGlobalControls();
 
@@ -133,23 +141,98 @@ function getPanelIdFromHash() {
     return null;
 }
 
+export function navigateToPanel(panelId, options = {}) {
+    const { saveStorage = true, updateHash = true, render = true } = options;
+    const targetId = panelId || "panel-dashboard";
+    const targetPanel = document.getElementById(targetId);
+
+    if (!targetPanel) {
+        console.warn(`[Navigation] Panel ${targetId} no existe, regresando a dashboard.`);
+        return navigateToPanel("panel-dashboard", options);
+    }
+
+    // Control estricto de roles: Verificar si el panel está permitido para el rol del usuario
+    const currentUser = getCurrentUser();
+    if (currentUser && !isPanelAllowedForUser(targetId, currentUser)) {
+        showAlert("Acceso denegado: Su rol no tiene permisos para acceder a este apartado.", "warning");
+        return navigateToPanel("panel-dashboard", { ...options, render: true });
+    }
+
+    // Actualizar clases activas en sidebar y paneles
+    document.querySelectorAll(".menu-item").forEach(mi => {
+        if (mi.getAttribute("data-target") === targetId) mi.classList.add("active");
+        else mi.classList.remove("active");
+    });
+
+    document.querySelectorAll(".panel").forEach(p => {
+        if (p.id === targetId) {
+            p.classList.add("active");
+            p.querySelectorAll(".table-container").forEach(tc => tc.scrollLeft = 0);
+        } else {
+            p.classList.remove("active");
+        }
+    });
+
+    // Persistir en storage para recuperar tras refresh/recarga
+    if (saveStorage) {
+        localStorage.setItem("activePanelId", targetId);
+        sessionStorage.setItem("activePanelId", targetId);
+    }
+
+    // Actualizar Hash de la URL de forma limpia
+    if (updateHash) {
+        const hashName = PANEL_HASH_MAP[targetId] || targetId.replace("panel-", "");
+        if (window.location.hash !== "#" + hashName) {
+            history.replaceState(null, "", "#" + hashName);
+        }
+    }
+
+    // Renderizar datos del módulo activo (solo si el rol lo tiene permitido)
+    if (render) {
+        if (targetId === "panel-dashboard") renderDashboard();
+        else if (targetId === "panel-personas") renderPersonasTable();
+        else if (targetId === "panel-familias") renderFamilias();
+        else if (targetId === "panel-viviendas") renderViviendasTree();
+        else if (targetId === "panel-usuarios" && isUserAdmin(currentUser)) renderUsuariosTable();
+        else if (targetId === "panel-reportes") renderCharts();
+        else if (targetId === "panel-parametros" && isUserAdmin(currentUser)) renderParametros();
+        else if (targetId === "panel-mi-cuenta") {
+            if (currentUser) {
+                const miNombreInput = document.getElementById("mi-nombre");
+                const miTelefonoInput = document.getElementById("mi-telefono");
+                if (miNombreInput) miNombreInput.value = currentUser.nombre_completo || "";
+                if (miTelefonoInput) miTelefonoInput.value = currentUser.telefono || "";
+            }
+        }
+    }
+
+    if (window.closeMobileSidebar) window.closeMobileSidebar();
+}
+window.navigateToPanel = navigateToPanel;
+
 function restoreActivePanel() {
     let targetPanelId = getPanelIdFromHash();
     if (!targetPanelId) {
         targetPanelId = localStorage.getItem("activePanelId") || sessionStorage.getItem("activePanelId") || "panel-dashboard";
     }
-
-    const targetMenuItem = document.querySelector(`.menu-item[data-target="${targetPanelId}"]`);
-    if (targetMenuItem && !targetMenuItem.classList.contains("hidden")) {
-        targetMenuItem.click();
-    } else {
-        const defaultMenuItem = document.querySelector(`.menu-item[data-target="panel-dashboard"]`);
-        if (defaultMenuItem) defaultMenuItem.click();
+    const currentUser = getCurrentUser();
+    if (currentUser && !isPanelAllowedForUser(targetPanelId, currentUser)) {
+        targetPanelId = "panel-dashboard";
     }
+    navigateToPanel(targetPanelId, { saveStorage: true, updateHash: true, render: true });
 }
 
 async function initApp() {
     initTheme();
+
+    const currentUser = getCurrentUser();
+
+    // 1. Restaurar visualmente el panel de inmediato al recargar para evitar parpadeos
+    let initialTargetId = getPanelIdFromHash() || localStorage.getItem("activePanelId") || sessionStorage.getItem("activePanelId") || "panel-dashboard";
+    if (currentUser && !isPanelAllowedForUser(initialTargetId, currentUser)) {
+        initialTargetId = "panel-dashboard";
+    }
+    navigateToPanel(initialTargetId, { saveStorage: true, updateHash: true, render: false });
 
     // Diagnóstico RLS: muestra cómo ve la base de datos la sesión actual
     if (supabase) {
@@ -164,15 +247,22 @@ async function initApp() {
 
     try { await populateSelects(); } catch (err) { console.warn("[App] Error cargando selectores:", err); }
     try { await populateProfessionsChecklist(); } catch (err) { console.warn("[App] Error cargando profesiones:", err); }
+    if (isUserAdmin(currentUser)) {
+        try { await populateRoleSelector(); } catch (err) { console.warn("[App] Error cargando selector de roles:", err); }
+    }
+
     try { await renderDashboard(); } catch (err) { console.warn("[App] Error renderizando dashboard:", err); }
     try { await renderPersonasTable(); } catch (err) { console.warn("[App] Error renderizando personas:", err); }
     try { await renderFamilias(); } catch (err) { console.warn("[App] Error renderizando familias:", err); }
     try { await renderViviendasTree(); } catch (err) { console.warn("[App] Error renderizando viviendas:", err); }
-    try { await renderUsuariosTable(); } catch (err) { console.warn("[App] Error renderizando usuarios:", err); }
-    try { await renderParametros(); } catch (err) { console.warn("[App] Error renderizando parámetros:", err); }
-    try { await populateRoleSelector(); } catch (err) { console.warn("[App] Error cargando selector de roles:", err); }
 
-    // Restaurar el panel/sección exacta en la que se encontraba el usuario
+    // Renderizado condicional estricto: usuarios y parámetros solo para Administradores
+    if (isUserAdmin(currentUser)) {
+        try { await renderUsuariosTable(); } catch (err) { console.warn("[App] Error renderizando usuarios:", err); }
+        try { await renderParametros(); } catch (err) { console.warn("[App] Error renderizando parámetros:", err); }
+    }
+
+    // 2. Garantizar que el panel en el que se quedó el usuario se sincronice y renderice completamente
     restoreActivePanel();
 }
 
@@ -190,6 +280,12 @@ function initTheme() {
             document.body.classList.remove("light-theme");
             if (moonIcon) moonIcon.classList.remove("hidden");
             if (sunIcon) sunIcon.classList.add("hidden");
+        }
+
+        // Si el panel de reportes gráficos está visible, redibujar gráficos con la paleta correspondiente
+        const reportesPanel = document.getElementById("panel-reportes");
+        if (reportesPanel && reportesPanel.classList.contains("active")) {
+            renderCharts();
         }
     };
 
@@ -216,30 +312,39 @@ async function populateRoleSelector() {
     try {
         const roles = await apiGetRoles();
         const currentRole = roles.find(r => r.id_rol === currentUser.id_rol);
-        const currentRoleName = currentRole ? currentRole.nombre_rol.toLowerCase() : "";
+        const currentRoleName = currentRole ? currentRole.nombre_rol.toLowerCase() : (currentUser.nombre_rol || "").toLowerCase();
 
-        // Solo administradores (fuerte o débil) pueden ver el panel de usuarios
-        const isAdmin = currentRoleName.includes("administrador") || currentRoleName.includes("admin");
+        const adminUuids = [
+            "eec65b46-ce49-41be-9da7-be001e7ce87e", // Administrador
+            "8c37a94d-7b05-42fc-9fdb-5e4eb8cee87f", // administrador_debil
+            "1",
+            "r-1",
+            "r-4"
+        ];
+        const isAdmin = currentRoleName.includes("administrador") || currentRoleName.includes("admin") || adminUuids.includes(String(currentUser.id_rol));
         const menuUsr = document.getElementById("menu-item-usuarios");
+        const menuParam = document.getElementById("menu-item-parametros");
 
-        if (isAdmin) {
-            menuUsr.classList.remove("hidden");
-        } else {
-            menuUsr.classList.add("hidden");
-            return; // No necesita el selector si no es admin
+        if (menuUsr) {
+            if (isAdmin) menuUsr.classList.remove("hidden");
+            else menuUsr.classList.add("hidden");
+        }
+        if (menuParam) {
+            if (isAdmin) menuParam.classList.remove("hidden");
+            else menuParam.classList.add("hidden");
         }
 
-        // Poblar el select con roles permitidos (NO incluir Administrador fuerte)
+        // Poblar el select con roles permitidos si existe en el DOM
         const usrRolSelect = document.getElementById("usr-rol");
-        usrRolSelect.innerHTML = `<option value="">Seleccione un rol...</option>`;
-
-        const allowedRoleNames = ["administrador_debil", "líder de comunidad", "lider de comunidad", "consultor"];
-
-        roles.forEach(r => {
-            if (allowedRoleNames.includes(r.nombre_rol.toLowerCase())) {
-                usrRolSelect.innerHTML += `<option value="${r.id_rol}">${r.nombre_rol}</option>`;
-            }
-        });
+        if (usrRolSelect) {
+            usrRolSelect.innerHTML = `<option value="">Seleccione un rol...</option>`;
+            const allowedRoleNames = ["administrador_debil", "líder de comunidad", "lider de comunidad", "consultor"];
+            roles.forEach(r => {
+                if (allowedRoleNames.includes(r.nombre_rol.toLowerCase())) {
+                    usrRolSelect.innerHTML += `<option value="${r.id_rol}">${r.nombre_rol}</option>`;
+                }
+            });
+        }
     } catch (err) {
         console.error("Error al cargar roles:", err);
     }
@@ -348,47 +453,12 @@ function setupEventListeners() {
 
     // Navegación Sidebar
     const menuItems = document.querySelectorAll(".menu-item");
-    const panels = document.querySelectorAll(".panel");
-
     menuItems.forEach(item => {
         item.addEventListener("click", () => {
-            menuItems.forEach(mi => mi.classList.remove("active"));
-            panels.forEach(p => p.classList.remove("active"));
-
-            item.classList.add("active");
             const targetId = item.getAttribute("data-target");
-            const targetPanel = document.getElementById(targetId);
-
             if (targetId) {
-                localStorage.setItem("activePanelId", targetId);
-                sessionStorage.setItem("activePanelId", targetId);
-                const hashName = PANEL_HASH_MAP[targetId] || targetId.replace("panel-", "");
-                if (window.location.hash !== "#" + hashName) {
-                    history.replaceState(null, "", "#" + hashName);
-                }
+                navigateToPanel(targetId);
             }
-
-            if (targetPanel) targetPanel.classList.add("active");
-
-            if (targetId === "panel-dashboard") renderDashboard();
-            if (targetId === "panel-personas") renderPersonasTable();
-            if (targetId === "panel-familias") renderFamilias();
-            if (targetId === "panel-viviendas") renderViviendasTree();
-            if (targetId === "panel-usuarios") renderUsuariosTable();
-            if (targetId === "panel-reportes") renderCharts();
-            if (targetId === "panel-parametros") renderParametros();
-            if (targetId === "panel-mi-cuenta") {
-                const currentUser = getCurrentUser();
-                if (currentUser) {
-                    const miNombreInput = document.getElementById("mi-nombre");
-                    const miTelefonoInput = document.getElementById("mi-telefono");
-                    if (miNombreInput) miNombreInput.value = currentUser.nombre_completo || "";
-                    if (miTelefonoInput) miTelefonoInput.value = currentUser.telefono || "";
-                }
-            }
-
-            // En móviles, cerrar el panel lateral tras seleccionar
-            if (window.closeMobileSidebar) window.closeMobileSidebar();
         });
     });
 
@@ -396,9 +466,9 @@ function setupEventListeners() {
     window.addEventListener("hashchange", () => {
         const targetPanelId = getPanelIdFromHash();
         if (targetPanelId) {
-            const menuItem = document.querySelector(`.menu-item[data-target="${targetPanelId}"]`);
-            if (menuItem && !menuItem.classList.contains("hidden") && !menuItem.classList.contains("active")) {
-                menuItem.click();
+            const activePanel = document.querySelector(".panel.active");
+            if (!activePanel || activePanel.id !== targetPanelId) {
+                navigateToPanel(targetPanelId);
             }
         }
     });
@@ -458,6 +528,8 @@ function setupEventListeners() {
 
     // Botones adicionales y flujos
     addSafeListener("btn-ver-grafico-filtros", "click", () => {
+        const filterGen = document.getElementById("filter-genero")?.value || "all";
+        setReportesSexFilter(filterGen);
         const btnReportes = document.getElementById("menu-item-reportes");
         if (btnReportes) btnReportes.click();
     });
@@ -527,6 +599,15 @@ function setupEventListeners() {
     if (btnExportarPdf) {
         btnExportarPdf.addEventListener("click", exportarReportesPDF);
     }
+
+    // Segmentación y Filtro Interactivo por Sexo en Reportes Gráficos
+    document.querySelectorAll("#reportes-sexo-filter-group .btn-segment").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const sex = btn.dataset.sex;
+            setReportesSexFilter(sex);
+            renderCharts();
+        });
+    });
 }
 
 // Helper control modal

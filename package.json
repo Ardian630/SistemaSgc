@@ -1,0 +1,13 @@
+{
+  "name": "sistema-sgc",
+  "version": "1.0.0",
+  "description": "Sistema de Gestión Comunal (SGC)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+

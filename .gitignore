@@ -21,3 +21,11 @@ Thumbs.db
 npm-debug.log*
 
 frontend/env.js
+GEMINI.md
+.agent/skills/analysis-decision-making/SKILL.md
+.agent/skills/animate/RECIPES.md
+.agent/skills/animate/SKILL.md
+.agent/skills/animation-performance/SKILL.md
+.agent/skills/frontend-design/LICENSE.txt
+.agent/skills/frontend-design/SKILL.md
+.agent/skills/web-design-ui/SKILL.md
