@@ -12,6 +12,9 @@ Este documento describe la información del proyecto y credenciales del propieta
 - [4. Estructura de Archivos del Proyecto](#4-estructura-de-archivos-del-proyecto)
   - [4.1 Directorio Raíz](#41-directorio-raíz)
   - [4.2 Directorio frontend/](#42-directorio-frontend)
+    - [4.2.1 Archivos Principales en frontend/](#421-archivos-principales-en-frontend)
+    - [4.2.2 Módulos de Aplicación (frontend/modules/app/)](#422-módulos-de-aplicación-frontendmodulesapp)
+    - [4.2.3 Módulos de Interfaz (frontend/modules/ui/)](#423-módulos-de-interfaz-frontendmodulesui)
   - [4.3 Directorio backend/supabase/](#43-directorio-backendsupabase)
 - [5. Sistema de Seguridad y Control de Acceso](#5-sistema-de-seguridad-y-control-de-acceso)
   - [5.1 Autenticación](#51-autenticación)
@@ -103,29 +106,74 @@ Supabase (Cloud)
 
 ```
 SistemaSgc-main/
-├── build.sh                → Script de construcción ejecutado por Vercel durante el despliegue.
-├── vercel.json             → Configuración del entorno de despliegue en Vercel.
-├── MANUAL_TECNICO.md           → Este documento.
-├── frontend/               → Código fuente completo del cliente (SPA).
+├── build.sh                    → Script de construcción ejecutado por Vercel durante el despliegue.
+├── vercel.json                 → Configuración del entorno de despliegue en Vercel.
+├── server.js                   → Servidor HTTP local para desarrollo y pruebas.
+├── frontend/                   → Código fuente completo del cliente (SPA).
+│   ├── app.js                  → Orquestador de arranque y ciclo de vida de la aplicación.
+│   ├── ui.js                   → Fachada pública re-exportadora de la capa de interfaz.
+│   ├── auth.js                 → Gestión de autenticación y sesiones.
+│   ├── supabase-client.js      → Cliente SDK y funciones de base de datos.
+│   ├── notifications.js        → Alertas flotantes (toasts) y modales de confirmación.
+│   ├── styles.css              → Hoja de estilos global consolidada.
+│   ├── index.html              → Estructura HTML única de la SPA.
+│   ├── env.js                  → Variables de entorno para Supabase.
+│   ├── env.example.js          → Plantilla de variables de entorno.
+│   └── modules/                → Arquitectura modular desacoplada en dos carpetas independientes.
+│       ├── app/                → Controladores, navegación, modales y eventos del sistema.
+│       └── ui/                 → Renderizado de vistas, tablas, reportes y exportación.
 └── backend/
-    └── supabase/           → Scripts SQL de la base de datos.
+    └── supabase/               → Scripts SQL de la base de datos (esquemas, triggers, RLS).
 ```
 
 ### 4.2 Directorio `frontend/`
 
-Contiene todos los archivos que conforman la aplicación visible al usuario. Estos archivos son servidos como contenido estático por Vercel.
+Contiene todos los archivos que conforman la aplicación visible al usuario. Estos archivos son servidos como contenido estático por Vercel o el servidor local.
+
+#### 4.2.1 Archivos Principales en `frontend/`
 
 | Archivo | Responsabilidad |
 |---|---|
-| `index.html` | **Punto de entrada único** de la aplicación. Contiene toda la estructura HTML del sistema: las 4 pantallas de autenticación (registro, login, recuperación de contraseña, restablecimiento de contraseña), la barra lateral completa, la barra superior, los 8 paneles de contenido (Dashboard, Censo, Familias, Viviendas, Usuarios, Reportes, Parámetros, Mi Cuenta) y todos los diálogos modales (7 en total). |
-| `styles.css` | Hoja de estilos global. Define el sistema de diseño completo: variables de color para tema claro y oscuro, tipografía, componentes (botones, tarjetas, tablas, modales, formularios, toasts), layout responsive y animaciones. |
-| `app.js` | **Controlador principal.** Punto de arranque del JavaScript. Inicializa la autenticación, configura los listeners de eventos de toda la interfaz (clics, envíos de formularios), coordina la navegación entre paneles y orquesta las llamadas entre la capa de datos y la capa visual. |
-| `ui.js` | **Capa de presentación.** Se encarga exclusivamente de manipular el DOM: rellenar tablas, mostrar y ocultar modales, renderizar tarjetas de familias, construir el árbol de estructura geográfica, y gestionar los filtros del censo. |
-| `auth.js` | **Gestor de sesión.** Controla el flujo de autenticación: verifica si hay una sesión activa al cargar la página, maneja el login, el registro del administrador inicial, el cierre de sesión y actualiza la interfaz del perfil del usuario en la barra lateral. |
-| `supabase-client.js` | **Capa de acceso a datos (Repositorio).** Inicializa el cliente de Supabase y expone todas las funciones de lectura y escritura hacia la base de datos (CRUD para personas, núcleos, viviendas, edificios, comunidades, profesiones, discapacidades, usuarios y roles). |
-| `notifications.js` | **Sistema de notificaciones.** Proporciona dos funciones: notificaciones flotantes tipo "toast" (informativas, de éxito, advertencia y error) con auto-cierre temporizado, y diálogos de confirmación con respuesta de aceptar/cancelar. |
-| `env.js` | **Variables de entorno.** Contiene las credenciales de conexión a Supabase (`SUPABASE_URL` y `SUPABASE_ANON_KEY`). En producción, este archivo es generado automáticamente por el script `build.sh`. En desarrollo local, se crea manualmente copiando `env.example.js`. |
-| `env.example.js` | Plantilla vacía de `env.js` para referencia del desarrollador. |
+| `index.html` | **Punto de entrada único** de la aplicación. Contiene la estructura HTML completa de la SPA: las 4 pantallas de autenticación (registro, login, recuperación de contraseña, restablecimiento), barra lateral, barra superior, los 8 paneles de contenido y los modales interactivos. |
+| `styles.css` | Hoja de estilos global consolidada. Define variables de color para tema oscuro y claro, tipografía unificada (Outfit, 13px en tablas según directrices), diseño responsive, componentes UI y animaciones. |
+| `app.js` | **Orquestador principal.** Punto de arranque de la SPA en el DOM (`DOMContentLoaded`). Inicializa el tema, configura controles globales, enlaza listeners, verifica la autenticación y coordina la inicialización de módulos. Re-exporta `navigateToPanel` para compatibilidad. |
+| `ui.js` | **Fachada pública de interfaz.** Centraliza y re-exporta de manera transparente todos los submódulos ubicados en `frontend/modules/ui/`, garantizando retrocompatibilidad con las llamadas del sistema. |
+| `auth.js` | **Gestor de sesión y autenticación.** Controla los flujos de login, registro, logout, comprobación de sesión activa y verificación de roles y permisos por panel. |
+| `supabase-client.js` | **Capa de acceso a datos (Repositorio).** Inicializa el cliente Supabase y expone las funciones de consulta y mutación hacia la base de datos (PostgreSQL/Supabase). |
+| `notifications.js` | **Sistema de notificaciones.** Proporciona toasts temporizados (éxito, advertencia, error, información) y modales de confirmación interactivos asíncronos. |
+| `env.js` | **Variables de entorno.** Contiene las credenciales de conexión (`SUPABASE_URL` y `SUPABASE_ANON_KEY`). Generado automáticamente en despliegue por `build.sh`. |
+| `env.example.js` | Plantilla de referencia para configuración de credenciales en entorno local. |
+
+#### 4.2.2 Módulos de Aplicación (`frontend/modules/app/`)
+
+Agrupa la lógica de control, flujo de navegación, gestión de modales, listeners y procesamiento de formularios:
+
+| Módulo | Responsabilidad |
+|---|---|
+| `app-theme.js` | Gestión del tema visual (claro / oscuro). Controla el botón alternador en el encabezado, actualiza íconos de sol/luna, persiste la preferencia en `localStorage` y actualiza dinámicamente los gráficos si el panel de reportes está activo. |
+| `app-navigation.js` | Enrutador interno de la SPA. Controla el cambio de paneles (`navigateToPanel`), sincroniza la URL con el Hash (`#dashboard`, `#personas`, etc.), persiste la pestaña activa en `localStorage`/`sessionStorage`, verifica permisos de rol y expone `window.navigateToPanel`. |
+| `app-modals.js` | Controladores de visibilidad y modales. Gestiona el toggle para mostrar/ocultar contraseñas, el colapso del sidebar en escritorio, el menú off-canvas móvil (`window.closeMobileSidebar`), la alternancia entre login/registro y la apertura/cierre de ventanas modales. |
+| `app-handlers-censo.js` | Controladores de formularios demográficos. Procesa el envío y validaciones de personas, familias, comunidades, edificios y viviendas, así como asociaciones de habitantes a viviendas. Registra funciones de acción global en `window` (`editComunidad`, `deleteVivienda`, etc.). |
+| `app-handlers-admin.js` | Controladores de administración y cuenta de usuario. Maneja la población del selector de roles según jerarquía, creación de nuevos usuarios, actualización de roles, configuración de parámetros (profesiones, discapacidades), edición de perfil y restablecimiento de contraseña. |
+| `app-listeners.js` | Registro centralizado de event listeners del DOM. Conecta todos los eventos de clic, cambio e input para navegación, buscador global con redirección reactiva al censo, filtros demográficos reactivos, botones de exportación y filtros de segmentación por sexo. |
+
+#### 4.2.3 Módulos de Interfaz (`frontend/modules/ui/`)
+
+Agrupa los componentes de presentación, renderizado de tablas, visualización de datos, estadísticas y exportación de archivos:
+
+| Módulo | Responsabilidad |
+|---|---|
+| `ui-common.js` | Estado compartido y utilidades comunes de interfaz. Mantiene la referencia a la comunidad activa (`activeCommunity`), control de caché local y la función centralizada de consulta `dbFetchAll()`. |
+| `ui-roles.js` | Verificaciones y reglas visuales basadas en roles de usuario para habilitar o restringir acciones en la interfaz. |
+| `ui-dashboard.js` | Renderizado del panel de control principal: tarjetas de métricas totales (habitantes, familias, viviendas, comunidades), indicadores demográficos y pirámide poblacional interactiva. |
+| `ui-personas.js` | Renderizado de la tabla de personas censadas, filtrado demográfico reactivo en tiempo real y formateo de datos secundarios en `.table-subtext`. |
+| `ui-familias-viviendas.js` | Renderizado de tarjetas de núcleos familiares y del árbol geográfico jerárquico de comunidades, edificios y viviendas. |
+| `ui-usuarios.js` | Renderizado de la tabla de gestión de usuarios del sistema y asignación de roles. |
+| `ui-forms.js` | Población dinámica de listas desplegables (`<select>`) en formularios y modales del censo y viviendas. |
+| `ui-crud.js` | Funciones puente de interfaz para operaciones de creación, edición y eliminación de personas, familias, viviendas, edificios y comunidades. |
+| `ui-parametros.js` | Renderizado y gestión de catálogos de parámetros del sistema: profesiones y discapacidades. |
+| `ui-reportes.js` | Inicialización y renderizado de gráficos estadísticos con Chart.js en alta resolución (High-DPI), paleta adaptativa por tema y segmentación por sexo. |
+| `ui-export.js` | Generación y descarga de informes: exportación a Excel (.xlsx) y generación de informes oficiales ejecutivos en PDF (incluyendo hoja dedicada para la pirámide demográfica). |
 
 ### 4.3 Directorio `backend/supabase/`
 
@@ -197,8 +245,7 @@ El sistema define 4 roles con diferentes niveles de acceso:
 ## 7. Navegación y Comportamiento de la Interfaz
 
 - **Single Page Application (SPA):** La aplicación nunca recarga la página ni navega a una URL diferente. Toda la navegación se realiza mostrando y ocultando paneles (`<section>`) dentro de un contenedor principal. El panel activo se identifica mediante el atributo `data-target` de los botones del menú lateral.
-- **Persistencia de la vista activa:** El ID del panel activo se almacena en `sessionStorage` con la clave `activePanelId`, de modo que al recargar la página el usuario regresa al mismo panel que estaba viendo.
-- **Búsqueda global:** La barra de búsqueda en la cabecera permite buscar por cédula, nombre o comunidad. Al presionar Enter, el sistema navega automáticamente al panel de Censo de Personas y aplica el término buscado como filtro.
+- **Persistencia de la vista activa y enrutamiento por Hash:** El ID del panel activo se almacena en `sessionStorage` y `localStorage` con la clave `activePanelId`, y se sincroniza dinámicamente con el Hash de la URL (`#dashboard`, `#personas`, `#familias`, etc.), de modo que al recargar la página o utilizar los botones de avance/retroceso del navegador, el usuario regresa exactamente al mismo panel conservando el estado.
+- **Búsqueda global:** La barra de búsqueda en la cabecera permite buscar por cédula, nombre o comunidad. Al escribir o presionar Enter, el sistema navega automáticamente al panel de Censo de Personas y aplica el término buscado como filtro reactivo.
 - **Selector de comunidad:** Disponible en la barra superior. Permite a los administradores filtrar toda la información visible por una comunidad específica o ver todas las comunidades.
-- **Tema claro/oscuro:** Alternado mediante un botón en la barra superior. Se implementa cambiando el atributo `data-theme` del elemento `<html>`, lo que activa un conjunto alternativo de variables CSS.
-- **Responsividad:** En pantallas menores a 768px, la barra lateral se oculta completamente y se muestra un botón de menú hamburguesa (☰) que la despliega como un panel deslizable con un overlay oscuro detrás.
+- **Tema claro/oscuro:** Alternado mediante un botón en la barra superior. Se implementa alternando la clase `.light-theme` en el `<body>` y persistiendo la selección en `localStorage` con la clave `theme`. Si el usuario se encuentra en el panel de reportes, los gráficos de Chart.js se recalculan automáticamente con la paleta de colores del tema seleccionado.
