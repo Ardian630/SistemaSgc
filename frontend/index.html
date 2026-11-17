@@ -508,9 +508,19 @@
                         </div>
 
                         <div class="chart-card">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                                <h4 style="margin: 0;">Pirámide Demográfica (Edad y Sexo)</h4>
-                                <span class="table-badge blue" style="font-size: 11px; padding: 2px 8px;">8 Cohortes</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <h4 style="margin: 0;">Pirámide Demográfica (Edad y Sexo)</h4>
+                                    <span class="table-badge blue" style="font-size: 11px; padding: 2px 8px;">8 Cohortes</span>
+                                </div>
+                                <button id="btn-print-pyramid" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px;" title="Imprimir Pirámide Demográfica en hoja separada (PDF)">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                                        <rect x="6" y="14" width="12" height="8"></rect>
+                                    </svg>
+                                    Imprimir Pirámide
+                                </button>
                             </div>
                             <div class="demographic-pyramid" id="age-bars-container">
                                 <!-- Cargado dinámicamente -->
