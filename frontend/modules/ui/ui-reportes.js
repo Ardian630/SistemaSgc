@@ -22,8 +22,11 @@ export function setReportesSexFilter(sex) {
 }
 
 export async function renderCharts() {
+    if (typeof document !== "undefined" && document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+    }
     const db = await dbFetchAll();
-    
+
     const filterText = document.getElementById("filter-cedula")?.value.toLowerCase().trim() || "";
     const filterAgeMin = document.getElementById("filter-edad-min")?.value || "";
     const filterAgeMax = document.getElementById("filter-edad-max")?.value || "";
@@ -62,7 +65,7 @@ export async function renderCharts() {
             if (!family || !family.id_vivienda) return false;
             const housing = db.viviendas.find(v => v.id_vivienda === family.id_vivienda);
             if (!housing) return false;
-            
+
             if (filterHomeType === "casa" && housing.id_edificio !== null) return false;
             if (filterHomeType === "apartamento" && housing.id_edificio === null) return false;
         }
@@ -119,8 +122,8 @@ export async function renderCharts() {
     }
 
     // 2. Aplicar el filtro de sexo a las gráficas existentes
-    const filtered = activeReportesSex !== "all" 
-        ? baseFiltered.filter(p => p.genero === activeReportesSex) 
+    const filtered = activeReportesSex !== "all"
+        ? baseFiltered.filter(p => p.genero === activeReportesSex)
         : baseFiltered;
 
     const totalHabitantes = filtered.length;
@@ -230,6 +233,7 @@ export async function renderCharts() {
     // Unificación tipográfica estricta para Chart.js
     if (window.Chart) {
         Chart.defaults.font.family = "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
     }
 
     // Colores dinámicos según el tema activo para legibilidad total y evitar textos en blanco
@@ -259,6 +263,7 @@ export async function renderCharts() {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: Math.max(window.devicePixelRatio || 1, 2),
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -279,14 +284,14 @@ export async function renderCharts() {
                     ticks: {
                         precision: 0,
                         color: chartTicksMutedColor,
-                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 11 }
+                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 12, weight: '500' }
                     },
                     grid: { color: chartGridLineColor }
                 },
                 y: {
                     ticks: {
                         color: chartAxisTextColor,
-                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 12, weight: '600' }
+                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 13, weight: '600' }
                     },
                     grid: { display: false }
                 }
@@ -298,7 +303,7 @@ export async function renderCharts() {
     const ctxDisc = document.getElementById("chart-discapacidades").getContext("2d");
     const discLabels = Object.keys(discCounts);
     const hasConditions = discLabels.length > 0;
-    
+
     chartDisc = new Chart(ctxDisc, {
         type: 'doughnut',
         data: {
@@ -327,14 +332,15 @@ export async function renderCharts() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: Math.max(window.devicePixelRatio || 1, 2),
             plugins: {
                 legend: {
                     position: 'bottom',
                     labels: {
                         color: chartLegendTextColor,
-                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 11, weight: '500' },
-                        padding: 10,
-                        boxWidth: 12
+                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 12, weight: '500' },
+                        padding: 12,
+                        boxWidth: 14
                     }
                 },
                 tooltip: {
@@ -392,6 +398,7 @@ export async function renderCharts() {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            devicePixelRatio: Math.max(window.devicePixelRatio || 1, 2),
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -412,14 +419,14 @@ export async function renderCharts() {
                     ticks: {
                         precision: 0,
                         color: chartTicksMutedColor,
-                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 11 }
+                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 12, weight: '500' }
                     },
                     grid: { color: chartGridLineColor }
                 },
                 y: {
                     ticks: {
                         color: chartAxisTextColor,
-                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 12, weight: '600' }
+                        font: { family: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif", size: 13, weight: '600' }
                     },
                     grid: { display: false }
                 }

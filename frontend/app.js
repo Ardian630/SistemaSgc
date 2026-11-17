@@ -92,6 +92,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Unificación tipográfica global para Chart.js
     if (typeof window !== "undefined" && window.Chart) {
         Chart.defaults.font.family = "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        Chart.defaults.devicePixelRatio = Math.max(window.devicePixelRatio || 1, 2);
     }
 
     // Inicializar controles globales (toggles de clave, sidebar, menú móvil, alternancia auth)
